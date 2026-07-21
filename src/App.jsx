@@ -6,20 +6,13 @@ import TokenPortalPage from './pages/TokenPortalPage';
 import AuditLogsPage from './pages/AuditLogsPage';
 import SecurityDashboardPage from './pages/SecurityDashboardPage';
 import DirectoryPage from './pages/DirectoryPage';
+import LoginPage from './pages/LoginPage';
 
 export default function App() {
   const [demoUsers, setDemoUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('results');
   const [loading, setLoading] = useState(true);
-
-  const fallbackAdmin = {
-    id: 'usr-admin',
-    username: 'admin',
-    full_name: 'System Administrator (Ogude Dean)',
-    role: 'Administrator',
-    department_id: null
-  };
 
   useEffect(() => {
     // 1. Fetch demo users for role switching
@@ -38,18 +31,7 @@ export default function App() {
         setCurrentUser(data.user);
       })
       .catch(() => {
-        // Fallback: Login default admin using real credentials to obtain valid JWT session
-        fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ username: 'admin', password: 'password123' }),
-        })
-          .then(res => res.json())
-          .then(data => {
-            if (data.user) setCurrentUser(data.user);
-          })
-          .catch(err => console.error('Auto login failed:', err));
+        setCurrentUser(null);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -91,6 +73,15 @@ export default function App() {
     );
   }
 
+  if (!currentUser && activeTab !== 'portal') {
+    return (
+      <LoginPage
+        onLoginSuccess={(user) => setCurrentUser(user)}
+        demoUsers={demoUsers}
+      />
+    );
+  }
+
   return (
     <div className="app-container">
       <Sidebar
@@ -102,7 +93,7 @@ export default function App() {
       />
 
       <div className="main-content">
-        <Header currentUser={activeTab === 'portal' ? null : currentUser} />
+        <Header currentUser={activeTab === 'portal' ? null : currentUser} onLogout={handleLogout} />
 
         <main className="page-body">
           {activeTab === 'results' && <ResultsPage currentUser={currentUser} />}

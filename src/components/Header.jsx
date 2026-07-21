@@ -1,7 +1,7 @@
 import React from 'react';
-import { Shield, Building2, User } from 'lucide-react';
+import { Shield, Building2, LogOut } from 'lucide-react';
 
-export default function Header({ currentUser }) {
+export default function Header({ currentUser, onLogout }) {
   return (
     <header className="top-header">
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -21,6 +21,12 @@ export default function Header({ currentUser }) {
           <div className="badge badge-role">
             <Shield size={12} /> {currentUser.role}
           </div>
+
+          {onLogout && (
+            <button className="btn btn-secondary btn-sm" onClick={onLogout} style={{ marginLeft: '4px' }}>
+              <LogOut size={12} /> Log Out
+            </button>
+          )}
         </div>
       )}
     </header>
