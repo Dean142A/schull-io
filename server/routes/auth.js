@@ -29,12 +29,14 @@ router.post('/login', loginRateLimiter, (req, res) => {
     return res.status(400).json({ error: 'Username and password are required' });
   }
 
+  const loginInput = username ? username.trim() : '';
+
   const user = db.prepare(`
     SELECT u.*, d.name as department_name, d.code as department_code
     FROM users u
     LEFT JOIN departments d ON u.department_id = d.id
-    WHERE u.username = ?
-  `).get(username);
+    WHERE u.username = ? OR u.email = ?
+  `).get(loginInput, loginInput);
 
   if (user && user.locked_until && new Date() < new Date(user.locked_until)) {
     recordFailedLoginAttempt(ip);

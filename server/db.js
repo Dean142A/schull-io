@@ -219,8 +219,16 @@ export function initDb() {
   safeMigrate(`ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0;`);
   safeMigrate(`ALTER TABLE users ADD COLUMN locked_until TEXT;`);
   safeMigrate(`ALTER TABLE users ADD COLUMN two_factor_pending_secret TEXT;`);
+  safeMigrate(`ALTER TABLE users ADD COLUMN email TEXT;`);
   safeMigrate(`ALTER TABLE tokens ADD COLUMN dispatched_at TEXT;`);
   safeMigrate(`ALTER TABLE tokens ADD COLUMN dispatched_to TEXT;`);
+
+  // Ensure demo user emails are populated
+  db.prepare(`UPDATE users SET email = 'admin@schull.io' WHERE username = 'admin' AND (email IS NULL OR email = '')`).run();
+  db.prepare(`UPDATE users SET email = 'cs_officer@schull.io' WHERE username = 'cs_officer' AND (email IS NULL OR email = '')`).run();
+  db.prepare(`UPDATE users SET email = 'math_officer@schull.io' WHERE username = 'math_officer' AND (email IS NULL OR email = '')`).run();
+  db.prepare(`UPDATE users SET email = 'cs_lecturer1@schull.io' WHERE username = 'cs_lecturer1' AND (email IS NULL OR email = '')`).run();
+  db.prepare(`UPDATE users SET email = 'math_lecturer1@schull.io' WHERE username = 'math_lecturer1' AND (email IS NULL OR email = '')`).run();
 
   // Seed Data if empty
   const userCount = db.prepare(`SELECT count(*) as count FROM users`).get();
@@ -248,24 +256,24 @@ function seedData() {
 
   // Users
   // Admin
-  db.prepare(`INSERT INTO users (id, username, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?)`).run(
-    'usr-admin', 'admin', defaultPassword, 'System Administrator (Ogude Dean)', 'Administrator', null
+  db.prepare(`INSERT INTO users (id, username, email, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+    'usr-admin', 'admin', 'admin@schull.io', defaultPassword, 'System Administrator (Ogude Dean)', 'Administrator', null
   );
 
   // Department Officers
-  db.prepare(`INSERT INTO users (id, username, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?)`).run(
-    'usr-officer-cs', 'cs_officer', defaultPassword, 'Dr. Sarah Connor', 'Department Officer', 'dept-cs'
+  db.prepare(`INSERT INTO users (id, username, email, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+    'usr-officer-cs', 'cs_officer', 'cs_officer@schull.io', defaultPassword, 'Dr. Sarah Connor', 'Department Officer', 'dept-cs'
   );
-  db.prepare(`INSERT INTO users (id, username, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?)`).run(
-    'usr-officer-math', 'math_officer', defaultPassword, 'Prof. Alan Turing', 'Department Officer', 'dept-math'
+  db.prepare(`INSERT INTO users (id, username, email, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+    'usr-officer-math', 'math_officer', 'math_officer@schull.io', defaultPassword, 'Prof. Alan Turing', 'Department Officer', 'dept-math'
   );
 
   // Lecturers
-  db.prepare(`INSERT INTO users (id, username, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?)`).run(
-    'usr-lecturer-cs1', 'cs_lecturer1', defaultPassword, 'Dr. Grace Hopper', 'Lecturer', 'dept-cs'
+  db.prepare(`INSERT INTO users (id, username, email, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+    'usr-lecturer-cs1', 'cs_lecturer1', 'cs_lecturer1@schull.io', defaultPassword, 'Dr. Grace Hopper', 'Lecturer', 'dept-cs'
   );
-  db.prepare(`INSERT INTO users (id, username, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?)`).run(
-    'usr-lecturer-math1', 'math_lecturer1', defaultPassword, 'Dr. Katherine Johnson', 'Lecturer', 'dept-math'
+  db.prepare(`INSERT INTO users (id, username, email, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+    'usr-lecturer-math1', 'math_lecturer1', 'math_lecturer1@schull.io', defaultPassword, 'Dr. Katherine Johnson', 'Lecturer', 'dept-math'
   );
 
   // Courses

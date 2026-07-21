@@ -81,7 +81,7 @@ export default function LoginPage({ onLoginSuccess, demoUsers = [] }) {
         </div>
 
         {/* Card */}
-        <div className="card" style={{ padding: '32px', borderRadius: 'var(--radius-modal)', boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.08)' }}>
+        <div className="card" style={{ padding: '32px', borderRadius: 'var(--radius-modal)', boxShadow: 'none', border: '1px solid var(--color-border)' }}>
           {error && (
             <div className="alert alert-error" style={{ marginBottom: '20px' }}>
               <AlertCircle size={16} />
@@ -97,13 +97,13 @@ export default function LoginPage({ onLoginSuccess, demoUsers = [] }) {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="label">Username</label>
+                <label className="label">Username or Email Address</label>
                 <div style={{ position: 'relative' }}>
                   <User size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--color-muted)' }} />
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="e.g. admin, cs_officer"
+                    placeholder="e.g. admin@schull.io or admin"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
@@ -186,30 +186,6 @@ export default function LoginPage({ onLoginSuccess, demoUsers = [] }) {
               </button>
             </form>
           )}
-
-          {/* Quick Demo Credentials Bar */}
-          <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--color-border)' }}>
-            <div className="caption" style={{ marginBottom: '10px', textAlign: 'center' }}>
-              Quick Demo Account Switcher
-            </div>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
-              {[
-                { label: 'Admin', username: 'admin', role: 'Administrator' },
-                { label: 'CS Officer', username: 'cs_officer', role: 'Department Officer' },
-                { label: 'CS Lecturer', username: 'cs_lecturer1', role: 'Lecturer' },
-              ].map(demo => (
-                <button
-                  key={demo.username}
-                  type="button"
-                  className="btn btn-sm btn-secondary"
-                  onClick={() => handleQuickDemoSelect(demo)}
-                  style={{ fontSize: '11px' }}
-                >
-                  {demo.label}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Footer */}

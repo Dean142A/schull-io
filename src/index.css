@@ -247,18 +247,20 @@ button:focus-visible {
 .form-control {
   font-family: var(--font-family);
   font-size: 14px;
+  height: 42px;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid var(--color-border);
   background-color: var(--color-surface);
   color: var(--color-ink);
   outline: none;
+  box-shadow: none;
   transition: border-color 0.15s ease;
 }
 
 .form-control:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+  box-shadow: none;
 }
 
 textarea.form-control {
