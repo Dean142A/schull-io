@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Production & Build outputs
+dist/
+
+# Database & SQLite files
+*.db
+*.sqlite
+*.sqlite3
+server/schull.db
+
+# Logs & Temporary files
+*.log
+npm-debug.log*
+
+# Environment variables
+.env
+.env.local
+
+# IDE & OS files
+.DS_Store
+.vscode/
+.idea/
