@@ -7,12 +7,14 @@ import AuditLogsPage from './pages/AuditLogsPage';
 import SecurityDashboardPage from './pages/SecurityDashboardPage';
 import DirectoryPage from './pages/DirectoryPage';
 import LoginPage from './pages/LoginPage';
+import ProfileModal from './components/ProfileModal';
 
 export default function App() {
   const [demoUsers, setDemoUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('results');
   const [loading, setLoading] = useState(true);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
 
   useEffect(() => {
     // 1. Fetch demo users for role switching
@@ -93,7 +95,11 @@ export default function App() {
       />
 
       <div className="main-content">
-        <Header currentUser={activeTab === 'portal' ? null : currentUser} onLogout={handleLogout} />
+        <Header
+          currentUser={activeTab === 'portal' ? null : currentUser}
+          onLogout={handleLogout}
+          onOpenProfile={() => setProfileModalOpen(true)}
+        />
 
         <main className="page-body">
           {activeTab === 'results' && <ResultsPage currentUser={currentUser} />}
@@ -102,6 +108,13 @@ export default function App() {
           {activeTab === 'audit' && <AuditLogsPage currentUser={currentUser} />}
           {activeTab === 'security' && <SecurityDashboardPage currentUser={currentUser} />}
         </main>
+
+        <ProfileModal
+          isOpen={profileModalOpen}
+          onClose={() => setProfileModalOpen(false)}
+          currentUser={currentUser}
+          onUpdateUser={(updatedUser) => setCurrentUser(updatedUser)}
+        />
       </div>
     </div>
   );

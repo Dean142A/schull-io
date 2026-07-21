@@ -204,6 +204,59 @@ router.get('/me', authenticateUser, (req, res) => {
   res.json({ user });
 });
 
+// POST /api/auth/profile - Update profile full_name and/or change password
+router.post('/profile', authenticateUser, (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const { full_name, current_password, new_password } = req.body;
+
+  const user = db.prepare(`SELECT * FROM users WHERE id = ?`).get(req.user.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  // Handle Full Name Update
+  if (full_name && typeof full_name === 'string' && full_name.trim().length > 0) {
+    db.prepare(`UPDATE users SET full_name = ? WHERE id = ?`).run(full_name.trim(), user.id);
+  }
+
+  // Handle Password Change
+  if (new_password) {
+    if (!current_password) {
+      return res.status(400).json({ error: 'Current password is required to set a new password' });
+    }
+
+    const isMatch = comparePassword(current_password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    if (typeof new_password !== 'string' || new_password.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+    }
+
+    const newHash = hashPassword(new_password);
+    db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).run(newHash, user.id);
+    recordAuditLog(req, 'PASSWORD_CHANGE', { user_id: user.id }, user);
+  }
+
+  const updatedUser = db.prepare(`
+    SELECT u.id, u.username, u.full_name, u.role, u.department_id, u.two_factor_enabled, d.name as department_name, d.code as department_code
+    FROM users u
+    LEFT JOIN departments d ON u.department_id = d.id
+    WHERE u.id = ?
+  `).get(user.id);
+
+  recordAuditLog(req, 'PROFILE_UPDATE', { user_id: user.id, full_name_updated: !!full_name, password_updated: !!new_password }, user);
+
+  res.json({
+    message: 'Profile updated successfully',
+    user: updatedUser
+  });
+});
+
 // POST /api/auth/2fa/setup - Generate 2FA Secret Key (with re-setup safeguard)
 router.post('/2fa/setup', authenticateUser, (req, res) => {
   if (!req.user) {
