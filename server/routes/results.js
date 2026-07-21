@@ -39,7 +39,73 @@ router.get('/directory', (req, res) => {
     ORDER BY c.code ASC
   `).all();
 
-  res.json({ students, courses });
+  const departments = db.prepare(`SELECT * FROM departments ORDER BY name ASC`).all();
+  const lecturers = db.prepare(`SELECT id, full_name, department_id FROM users WHERE role = 'Lecturer' ORDER BY full_name ASC`).all();
+
+  res.json({ students, courses, departments, lecturers });
+});
+
+// POST /api/results/directory/students - Register New Student (Admin or Department Officer own dept)
+router.post('/directory/students', authorize('MODIFY_RESULTS'), (req, res) => {
+  const { student_code, full_name, department_id, parent_email, parent_phone } = req.body;
+
+  if (!student_code || !full_name || !department_id) {
+    return res.status(400).json({ error: 'student_code, full_name, and department_id are required' });
+  }
+
+  // Department Officer Scope Check
+  if (req.user.role === 'Department Officer' && department_id !== req.user.department_id) {
+    return res.status(403).json({ error: 'Forbidden: You can only register students for your assigned department.' });
+  }
+
+  const id = 'std-' + crypto.randomUUID();
+
+  try {
+    db.prepare(`
+      INSERT INTO students (id, student_code, full_name, department_id, parent_email, parent_phone)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, student_code.trim().toUpperCase(), full_name.trim(), department_id, parent_email?.trim() || null, parent_phone?.trim() || null);
+
+    recordAuditLog(req, 'STUDENT_REGISTERED', { student_id: id, student_code: student_code.trim().toUpperCase(), full_name: full_name.trim() });
+
+    res.status(201).json({ message: 'Student registered successfully', id });
+  } catch (err) {
+    if (err.message.includes('UNIQUE constraint failed')) {
+      return res.status(409).json({ error: `Student code '${student_code}' is already registered.` });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/results/directory/courses - Create New Course (Admin or Department Officer own dept)
+router.post('/directory/courses', authorize('MODIFY_RESULTS'), (req, res) => {
+  const { code, title, department_id, lecturer_id } = req.body;
+
+  if (!code || !title || !department_id) {
+    return res.status(400).json({ error: 'code, title, and department_id are required' });
+  }
+
+  if (req.user.role === 'Department Officer' && department_id !== req.user.department_id) {
+    return res.status(403).json({ error: 'Forbidden: You can only create courses in your assigned department.' });
+  }
+
+  const id = 'crs-' + crypto.randomUUID();
+
+  try {
+    db.prepare(`
+      INSERT INTO courses (id, code, title, department_id, lecturer_id)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, code.trim().toUpperCase(), title.trim(), department_id, lecturer_id || null);
+
+    recordAuditLog(req, 'COURSE_CREATED', { course_id: id, code: code.trim().toUpperCase(), title: title.trim() });
+
+    res.status(201).json({ message: 'Course created successfully', id });
+  } catch (err) {
+    if (err.message.includes('UNIQUE constraint failed')) {
+      return res.status(409).json({ error: `Course code '${code}' already exists.` });
+    }
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GET /api/results - Filtered by User Scope (Department/Course)

@@ -48,6 +48,8 @@ export function initDb() {
       role TEXT NOT NULL CHECK(role IN ('Administrator', 'Lecturer', 'Department Officer', 'Parent/Student Viewer')),
       department_id TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
+      failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+      locked_until TEXT,
       two_factor_enabled INTEGER NOT NULL DEFAULT 0,
       two_factor_secret TEXT,
       FOREIGN KEY(department_id) REFERENCES departments(id)
@@ -144,6 +146,16 @@ export function initDb() {
       value TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS result_appeals (
+      id TEXT PRIMARY KEY,
+      result_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('Pending', 'Reviewed', 'Rejected', 'Resolved')),
+      created_at TEXT NOT NULL,
+      FOREIGN KEY(result_id) REFERENCES results(id)
+    );
+
     -- Indexing for performance as audit volume grows
     CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp);
     CREATE INDEX IF NOT EXISTS idx_audit_ip ON audit_logs(ip_address);
@@ -173,12 +185,10 @@ export function initDb() {
   setThreshold.run();
   setTokenExpiry.run();
 
-  // Column Migration
-  try {
-    db.exec(`ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;`);
-  } catch (e) {
-    // Column already exists
-  }
+  // Column Migrations
+  try { db.exec(`ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;`); } catch (e) {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0;`); } catch (e) {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN locked_until TEXT;`); } catch (e) {}
 
   // Seed Data if empty
   const userCount = db.prepare(`SELECT count(*) as count FROM users`).get();

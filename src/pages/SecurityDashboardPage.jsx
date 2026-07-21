@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, AlertTriangle, User, Key, Settings, RefreshCw, CheckCircle } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, User, Key, Settings, RefreshCw, CheckCircle, Lock, ShieldOff } from 'lucide-react';
 
 export default function SecurityDashboardPage({ currentUser }) {
   const [data, setData] = useState(null);
@@ -80,6 +80,25 @@ export default function SecurityDashboardPage({ currentUser }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setSuccess(data.message);
+      fetchDashboard();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleUnlockUser = async (userId) => {
+    setError('');
+    setSuccess('');
+    try {
+      const res = await fetch('/api/security/unlock-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ user_id: userId })
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      setSuccess(resData.message);
       fetchDashboard();
     } catch (err) {
       setError(err.message);
@@ -270,6 +289,63 @@ export default function SecurityDashboardPage({ currentUser }) {
                     <td style={{ fontWeight: 700 }}>{staff.total_tokens}</td>
                     <td style={{ color: 'var(--color-success)', fontWeight: 600 }}>{staff.redeemed_tokens}</td>
                     <td style={{ color: 'var(--color-muted)' }}>{staff.invalidated_tokens}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Locked or Disabled Staff Accounts */}
+      <div className="card" style={{ marginTop: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <Lock size={18} style={{ color: 'var(--color-error)' }} />
+          <h2 className="h2">Locked & Disabled Staff Accounts</h2>
+        </div>
+
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Full Name</th>
+                <th>Role</th>
+                <th>Failed Attempts</th>
+                <th>Status</th>
+                <th>Lock Expiry / Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!data?.locked_users || data?.locked_users.length === 0 ? (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '20px' }} className="caption">
+                    No staff accounts are currently locked or disabled.
+                  </td>
+                </tr>
+              ) : (
+                data?.locked_users.map(user => (
+                  <tr key={user.id}>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{user.username}</td>
+                    <td>{user.full_name}</td>
+                    <td><span className="badge badge-role" style={{ fontSize: '11px' }}>{user.role}</span></td>
+                    <td style={{ color: 'var(--color-error)', fontWeight: 700 }}>{user.failed_login_attempts}</td>
+                    <td>
+                      {user.is_active === 0 ? (
+                        <span className="badge" style={{ background: '#FEE2E2', color: '#991B1B' }}>Deactivated</span>
+                      ) : (
+                        <span className="badge" style={{ background: '#FEF3C7', color: '#92400E' }}>Locked</span>
+                      )}
+                    </td>
+                    <td>
+                      <button 
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => handleUnlockUser(user.id)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <ShieldOff size={14} /> Unlock Account
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

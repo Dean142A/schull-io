@@ -35,6 +35,7 @@ describe('schull.io Security & System Correctness Test Suite', () => {
     db.exec(`
       DROP TRIGGER IF EXISTS prevent_audit_delete;
       DROP TRIGGER IF EXISTS prevent_audit_update;
+      DROP TABLE IF EXISTS result_appeals;
       DROP TABLE IF EXISTS result_history;
       DROP TABLE IF EXISTS tokens;
       DROP TABLE IF EXISTS sessions;
@@ -146,9 +147,9 @@ describe('schull.io Security & System Correctness Test Suite', () => {
 
   describe('3. Lifecycle Rules & Optimistic Concurrency Control (OCC)', () => {
     it('enforces mandatory state transition: Uploaded -> Locked -> Published (Direct Uploaded -> Published fails)', async () => {
-      // res-103 is Uploaded
+      // res-105 is Uploaded
       const res = await request(app)
-        .post('/api/results/res-103/publish')
+        .post('/api/results/res-105/publish')
         .set('Cookie', adminCookie);
 
       expect(res.status).toBe(400);
@@ -266,6 +267,98 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       const lockLog = auditRes.body.find(l => l.action === 'LOCK_RESULT' && l.actor_name.includes('Ogude Dean'));
       expect(lockLog).toBeDefined();
       expect(lockLog.department_id).toBe('dept-cs');
+    });
+  });
+
+  describe('7. High-Value Feature Extensions (Lockout, Directory Management, Result Appeals)', () => {
+    it('locks account after 5 consecutive failed login attempts and unlocks via Admin security route', async () => {
+      // 5 failed password attempts
+      for (let i = 0; i < 5; i++) {
+        await request(app)
+          .post('/api/auth/login')
+          .send({ username: 'cs_lecturer1', password: 'wrongpassword' });
+      }
+
+      // 6th attempt should return 429 Account Locked
+      const lockedRes = await request(app)
+        .post('/api/auth/login')
+        .send({ username: 'cs_lecturer1', password: 'wrongpassword' });
+
+      expect(lockedRes.status).toBe(429);
+      expect(lockedRes.body.error).toMatch(/Account.*locked/i);
+
+      // Admin unlocks account
+      const unlockRes = await request(app)
+        .post('/api/security/unlock-user')
+        .set('Cookie', adminCookie)
+        .send({ user_id: 'usr-lecturer-cs1' });
+
+      expect(unlockRes.status).toBe(200);
+
+      // Verify user can now log in cleanly
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ username: 'cs_lecturer1', password: 'password123' });
+
+      expect(loginRes.status).toBe(200);
+    });
+
+    it('registers a new student and course via staff directory endpoints', async () => {
+      // Register student
+      const stdRes = await request(app)
+        .post('/api/results/directory/students')
+        .set('Cookie', csOfficerCookie)
+        .send({
+          student_code: 'STU/2026/099',
+          full_name: 'Test New Student',
+          department_id: 'dept-cs',
+          parent_email: 'parent.test@example.com'
+        });
+
+      expect(stdRes.status).toBe(201);
+
+      // Create course
+      const crsRes = await request(app)
+        .post('/api/results/directory/courses')
+        .set('Cookie', csOfficerCookie)
+        .send({
+          code: 'CS499',
+          title: 'Advanced Security Capstone',
+          department_id: 'dept-cs'
+        });
+
+      expect(crsRes.status).toBe(201);
+    });
+
+    it('submits a parent result appeal from an active viewer session', async () => {
+      // Generate & redeem token for Published result res-101
+      const genRes = await request(app)
+        .post('/api/tokens/generate')
+        .set('Cookie', adminCookie)
+        .send({ result_id: 'res-101' });
+
+      const redeemRes = await request(app)
+        .post('/api/tokens/redeem')
+        .send({ raw_token: genRes.body.raw_token });
+
+      const cookie = redeemRes.headers['set-cookie'];
+
+      // Submit appeal
+      const appealRes = await request(app)
+        .post('/api/tokens/appeal')
+        .set('Cookie', cookie)
+        .send({ reason: 'Discrepancy in continuous assessment grade' });
+
+      expect(appealRes.status).toBe(201);
+      expect(appealRes.body.message).toMatch(/submitted successfully/i);
+
+      // Verify active appeal attached on view-result
+      const viewRes = await request(app)
+        .get('/api/tokens/view-result')
+        .set('Cookie', cookie);
+
+      expect(viewRes.body.result.active_appeal).toBeDefined();
+      expect(viewRes.body.result.active_appeal.status).toBe('Pending');
     });
   });
 });

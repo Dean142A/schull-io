@@ -31,12 +31,32 @@ router.post('/login', (req, res) => {
     WHERE u.username = ?
   `).get(username);
 
+  if (user && user.locked_until && new Date() < new Date(user.locked_until)) {
+    recordAuditLog(req, 'LOGIN_BLOCKED_LOCKED', { username }, { id: 'anonymous', full_name: username, role: 'Guest', department_id: null });
+    return res.status(429).json({ error: 'Account temporarily locked due to 5 consecutive failed login attempts. Contact an Administrator to unlock.' });
+  }
+
   const isPasswordValid = user ? comparePassword(password, user.password_hash) : false;
 
   if (!user || !isPasswordValid || user.is_active === 0) {
+    if (user) {
+      const attempts = (user.failed_login_attempts || 0) + 1;
+      if (attempts >= 5) {
+        const lockTime = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins lock
+        db.prepare(`UPDATE users SET failed_login_attempts = ?, locked_until = ? WHERE id = ?`).run(attempts, lockTime, user.id);
+        recordAuditLog(req, 'ACCOUNT_LOCKED', { username, attempts, lock_until: lockTime }, user);
+        return res.status(429).json({ error: 'Account locked due to 5 consecutive failed login attempts. Contact an Administrator to unlock.' });
+      } else {
+        db.prepare(`UPDATE users SET failed_login_attempts = ? WHERE id = ?`).run(attempts, user.id);
+      }
+    }
+
     recordAuditLog(req, 'LOGIN_FAILED', { username, reason: !user ? 'User not found' : (user.is_active === 0 ? 'Account deactivated' : 'Invalid password') }, { id: 'anonymous', full_name: username || 'Unknown', role: 'Guest', department_id: null });
     return res.status(401).json({ error: 'Invalid credentials' });
   }
+
+  // Reset failed login attempts on successful login
+  db.prepare(`UPDATE users SET failed_login_attempts = 0, locked_until = null WHERE id = ?`).run(user.id);
 
   // Issue signed JWT Token
   const token = jwt.sign(

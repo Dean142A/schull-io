@@ -57,9 +57,11 @@ router.get('/dashboard', (req, res) => {
     ORDER BY count DESC
   `).all();
 
-  // 4. Live System Metrics
-  const resultStats = db.prepare(`
-    SELECT status, COUNT(*) as count FROM results GROUP BY status
+  // 5. Locked or Disabled Users
+  const lockedUsers = db.prepare(`
+    SELECT id, username, full_name, role, failed_login_attempts, locked_until, is_active
+    FROM users
+    WHERE (locked_until IS NOT NULL AND locked_until > datetime('now')) OR is_active = 0 OR failed_login_attempts > 0
   `).all();
 
   res.json({
@@ -68,8 +70,28 @@ router.get('/dashboard', (req, res) => {
     token_stats_by_staff: tokenStatsByStaff,
     activity_breakdown: activityBreakdown,
     result_stats: resultStats,
+    locked_users: lockedUsers,
     live_failed_attempts: getFailedAttemptsByIp(),
   });
+});
+
+// POST /api/security/unlock-user - Admin unlock of locked or disabled user accounts
+router.post('/unlock-user', (req, res) => {
+  const { user_id } = req.body;
+  if (!user_id) {
+    return res.status(400).json({ error: 'user_id is required' });
+  }
+
+  const user = db.prepare(`SELECT * FROM users WHERE id = ?`).get(user_id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  db.prepare(`UPDATE users SET failed_login_attempts = 0, locked_until = null, is_active = 1 WHERE id = ?`).run(user_id);
+
+  recordAuditLog(req, 'ADMIN_ACCOUNT_UNLOCK', { unlocked_user_id: user_id, unlocked_username: user.username });
+
+  res.json({ message: `Account for ${user.full_name} (${user.username}) has been unlocked successfully.` });
 });
 
 // PUT /api/security/settings - Update threshold / settings

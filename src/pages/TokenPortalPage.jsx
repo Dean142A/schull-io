@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { KeyRound, Clock, ShieldCheck, AlertCircle, RefreshCw } from 'lucide-react';
+import { KeyRound, Clock, ShieldCheck, AlertCircle, RefreshCw, Download, Flag, CheckCircle, X } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 
 export default function TokenPortalPage() {
   const [tokenInput, setTokenInput] = useState('');
@@ -9,6 +10,12 @@ export default function TokenPortalPage() {
   const [loading, setLoading] = useState(false);
   const [expiresAt, setExpiresAt] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState('');
+
+  // Appeal Modal state
+  const [showAppealModal, setShowAppealModal] = useState(false);
+  const [appealReason, setAppealReason] = useState('');
+  const [appealMessage, setAppealMessage] = useState('');
+  const [appealError, setAppealError] = useState('');
 
   // Auto-fetch result if active httpOnly session cookie exists
   useEffect(() => {
@@ -108,6 +115,70 @@ export default function TokenPortalPage() {
     setError('');
   };
 
+  const handleDownloadPdf = () => {
+    if (!result) return;
+    const doc = new jsPDF();
+    doc.setFontSize(22);
+    doc.setTextColor(59, 29, 130);
+    doc.text('schull.io Academic Result Transcript', 20, 20);
+    
+    doc.setFontSize(11);
+    doc.setTextColor(80, 80, 80);
+    doc.text(`Official Verified Document - Issued: ${new Date().toLocaleString()}`, 20, 28);
+    doc.line(20, 32, 190, 32);
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text(`Student Name: ${result.student_name}`, 20, 44);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Student Code: ${result.student_code}`, 20, 52);
+    doc.text(`Department: ${result.department_name}`, 20, 60);
+
+    doc.line(20, 68, 190, 68);
+    doc.text(`Course Code: ${result.course_code}`, 20, 78);
+    doc.text(`Course Title: ${result.course_title}`, 20, 86);
+    doc.text(`Academic Period: ${result.session} (${result.semester} Semester)`, 20, 94);
+
+    doc.setFillColor(245, 243, 255);
+    doc.rect(20, 105, 170, 35, 'F');
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(59, 29, 130);
+    doc.text(`FINAL SCORE: ${result.score.toFixed(1)} / 100`, 30, 124);
+    doc.text(`GRADE: ${result.grade}`, 135, 124);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(120, 120, 120);
+    doc.text('This transcript was generated from a single-use verified session on schull.io.', 20, 155);
+    doc.text('Authenticity can be verified at http://localhost:3001/tokens', 20, 162);
+
+    doc.save(`Transcript_${result.student_code.replace(/\//g, '_')}_${result.course_code}.pdf`);
+  };
+
+  const handleCreateAppeal = async (e) => {
+    e.preventDefault();
+    setAppealError('');
+    setAppealMessage('');
+    try {
+      const res = await fetch('/api/tokens/appeal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ reason: appealReason }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setAppealMessage(data.message);
+      setShowAppealModal(false);
+      setAppealReason('');
+      fetchSessionResult();
+    } catch (err) {
+      setAppealError(err.message);
+    }
+  };
+
   return (
     <div style={{ maxWidth: '680px', margin: '20px auto 0 auto' }}>
       {/* Wordmark Title for Public Portal */}
@@ -123,6 +194,12 @@ export default function TokenPortalPage() {
       {error && (
         <div className="alert alert-error" style={{ marginBottom: '20px' }}>
           <AlertCircle size={16} /> <span>{error}</span>
+        </div>
+      )}
+
+      {appealMessage && (
+        <div className="alert" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#166534', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <CheckCircle size={16} /> <span>{appealMessage}</span>
         </div>
       )}
 
@@ -194,8 +271,8 @@ export default function TokenPortalPage() {
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn btn-sm btn-secondary" onClick={() => window.print()} title="Print or Save PDF Transcript">
-                Print Official Transcript
+              <button className="btn btn-sm btn-secondary" onClick={handleDownloadPdf} title="Download Official PDF Transcript">
+                <Download size={12} /> PDF Transcript
               </button>
               <button className="btn btn-sm btn-secondary" onClick={() => fetchSessionResult()} title="Re-verify Status">
                 <RefreshCw size={12} /> Verify Realtime Status
@@ -205,6 +282,17 @@ export default function TokenPortalPage() {
               </button>
             </div>
           </div>
+
+          {/* Active Appeal Banner */}
+          {result.active_appeal && (
+            <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', padding: '12px 16px', borderRadius: '6px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#92400E' }}>
+                <Flag size={16} />
+                <span>Verification Appeal Submitted: <strong>{result.active_appeal.status}</strong></span>
+              </div>
+              <span className="caption" style={{ color: '#B45309' }}>Submitted {new Date(result.active_appeal.created_at).toLocaleDateString()}</span>
+            </div>
+          )}
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-border)', paddingBottom: '16px', marginBottom: '20px' }}>
             <div>
@@ -249,8 +337,58 @@ export default function TokenPortalPage() {
             </div>
           </div>
 
-          <div className="caption" style={{ marginTop: '24px', textAlign: 'center', color: 'var(--color-muted)' }}>
+          {/* Result Appeal Action */}
+          <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center' }}>
+            <button 
+              className="btn btn-secondary btn-sm"
+              onClick={() => setShowAppealModal(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Flag size={14} /> Request Score Verification / Appeal Result
+            </button>
+          </div>
+
+          <div className="caption" style={{ marginTop: '20px', textAlign: 'center', color: 'var(--color-muted)' }}>
             This session re-verifies the live status of the result on every interaction. If an administrator unpublishes this record, your access expires instantly.
+          </div>
+        </div>
+      )}
+
+      {/* Appeal Submission Modal */}
+      {showAppealModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="card" style={{ width: '450px', position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 className="h2">Submit Result Appeal</h2>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowAppealModal(false)}><X size={14} /></button>
+            </div>
+
+            {appealError && (
+              <div className="alert alert-error" style={{ marginBottom: '12px' }}>
+                <AlertCircle size={14} /> {appealError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateAppeal} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <p className="small">
+                Submit an official request for score re-checking or verification. Department officers will be notified to review the grade calculation.
+              </p>
+              <div>
+                <label className="caption">Reason for Appeal / Score Discrepancy</label>
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  required
+                  placeholder="Describe the discrepancy (e.g. missing continuous assessment score)..."
+                  value={appealReason}
+                  onChange={e => setAppealReason(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAppealModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Submit Appeal</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

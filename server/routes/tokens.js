@@ -258,8 +258,13 @@ router.get('/view-result', (req, res) => {
     });
   }
 
+  const activeAppeal = db.prepare(`
+    SELECT id, reason, status, created_at FROM result_appeals WHERE result_id = ? ORDER BY created_at DESC LIMIT 1
+  `).get(result.id);
+
   res.json({
     result: {
+      id: result.id,
       student_name: result.student_name,
       student_code: result.student_code,
       course_code: result.course_code,
@@ -270,8 +275,49 @@ router.get('/view-result', (req, res) => {
       score: result.score,
       grade: result.grade,
       status: result.status,
+      active_appeal: activeAppeal || null,
     },
     session_expires_at: session.expires_at,
+  });
+});
+
+// POST /api/tokens/appeal - Submit Parent/Student Result Verification Appeal
+router.post('/appeal', (req, res) => {
+  const sessionToken = req.cookies?.schull_session_token;
+  const { reason } = req.body;
+
+  if (!sessionToken) {
+    return res.status(401).json({ error: 'Session token required' });
+  }
+
+  if (!reason || reason.trim().length === 0) {
+    return res.status(400).json({ error: 'A mandatory reason is required to submit a result appeal.' });
+  }
+
+  const session = db.prepare(`SELECT * FROM sessions WHERE id = ?`).get(sessionToken);
+  if (!session || new Date() > new Date(session.expires_at)) {
+    return res.status(401).json({ error: 'Session expired or invalid' });
+  }
+
+  const result = db.prepare(`SELECT * FROM results WHERE id = ?`).get(session.result_id);
+  if (!result || result.status !== 'Published') {
+    return res.status(403).json({ error: 'Access Revoked: Result is no longer Published.' });
+  }
+
+  const appealId = 'app-' + crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+
+  db.prepare(`
+    INSERT INTO result_appeals (id, result_id, session_id, reason, status, created_at)
+    VALUES (?, ?, ?, ?, 'Pending', ?)
+  `).run(appealId, result.id, sessionToken, reason.trim(), createdAt);
+
+  recordAuditLog(req, 'RESULT_APPEAL_SUBMITTED', { appeal_id: appealId, result_id: result.id, reason: reason.trim() });
+
+  res.status(201).json({
+    message: 'Result appeal submitted successfully. Your request has been queued for review by department officers.',
+    appeal_id: appealId,
+    created_at: createdAt
   });
 });
 
