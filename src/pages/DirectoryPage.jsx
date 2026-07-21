@@ -210,7 +210,7 @@ export default function DirectoryPage({ currentUser }) {
 
         <div style={{ display: 'flex', gap: '8px' }} id="tour-dir-actions">
           <button className="btn btn-secondary" onClick={() => setTourOpen(true)}>
-            <Sparkles size={14} style={{ color: 'var(--color-primary)' }} /> Take Guided Tour
+            Take Guided Tour
           </button>
           {isStaffManager && (
             <>

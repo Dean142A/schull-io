@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, X, ChevronRight, ChevronLeft, CheckCircle } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, CheckCircle } from 'lucide-react';
 import './OnboardingTour.css';
 
 export default function OnboardingTour({ tourKey, steps = [], isOpen, onClose, onComplete }) {
@@ -26,7 +26,6 @@ export default function OnboardingTour({ tourKey, steps = [], isOpen, onClose, o
         height: rect.height,
       });
     } else {
-      // Fallback center position if target ID is not rendered
       setTargetRect({
         top: window.innerHeight / 2 - 50,
         left: window.innerWidth / 2 - 100,
@@ -82,21 +81,17 @@ export default function OnboardingTour({ tourKey, steps = [], isOpen, onClose, o
   const tooltipHeight = 220;
 
   if (targetRect) {
-    // Prefer placement below target
     let top = targetRect.top + targetRect.height + padding;
     let left = targetRect.left + targetRect.width / 2 - tooltipWidth / 2;
 
-    // Check bottom overflow -> place above
     if (top + tooltipHeight > window.innerHeight) {
       top = targetRect.top - tooltipHeight - padding;
     }
 
-    // Check top overflow -> clamp
     if (top < padding) {
       top = padding;
     }
 
-    // Clamp horizontal boundaries
     if (left < padding) left = padding;
     if (left + tooltipWidth > window.innerWidth - padding) {
       left = window.innerWidth - tooltipWidth - padding;
@@ -107,15 +102,18 @@ export default function OnboardingTour({ tourKey, steps = [], isOpen, onClose, o
 
   return (
     <>
-      {/* Backdrop & Spotlight Box */}
+      {/* Backdrop Blur Overlay */}
+      <div className="tour-backdrop-overlay" />
+
+      {/* Spotlight Box Cutout (No Stroke, Dark Background Overlay) */}
       {targetRect && (
         <div
           className="tour-spotlight-box"
           style={{
-            top: `${targetRect.top - 6}px`,
-            left: `${targetRect.left - 6}px`,
-            width: `${targetRect.width + 12}px`,
-            height: `${targetRect.height + 12}px`,
+            top: `${targetRect.top - 4}px`,
+            left: `${targetRect.left - 4}px`,
+            width: `${targetRect.width + 8}px`,
+            height: `${targetRect.height + 8}px`,
           }}
         />
       )}
@@ -124,7 +122,7 @@ export default function OnboardingTour({ tourKey, steps = [], isOpen, onClose, o
       <div className="tour-tooltip-card" style={tooltipStyle}>
         <div className="tour-header">
           <span className="tour-badge">
-            <Sparkles size={12} /> Step {currentStep + 1} of {steps.length}
+            Step {currentStep + 1} of {steps.length}
           </span>
           <button className="tour-close-btn" onClick={handleSkip} title="Skip tour">
             <X size={14} />

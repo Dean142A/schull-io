@@ -1,39 +1,29 @@
-/* schull.io Onboarding Tour Styles (Matching Design System) */
+/* schull.io Onboarding Tour Styles (Clean & Dark Blur, No Strokes, No Glows) */
 
-.tour-spotlight-backdrop {
+.tour-backdrop-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
   z-index: 9998;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   pointer-events: none;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Spotlight Highlight Box around Active Element */
+/* Clean Spotlight Box Cutout around Active Element (No stroke, No border glow) */
 .tour-spotlight-box {
   position: fixed;
   z-index: 9999;
   border-radius: var(--radius-card);
-  box-shadow: 0 0 0 9999px rgba(15, 15, 20, 0.72);
-  border: 2px solid var(--color-primary);
-  box-shadow: 0 0 0 9999px rgba(15, 15, 20, 0.72), 0 0 0 4px rgba(65, 0, 244, 0.25), 0 0 24px rgba(65, 0, 244, 0.35);
+  border: none;
+  box-shadow: 0 0 0 9999px rgba(10, 10, 14, 0.82);
   pointer-events: auto;
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-  animation: tourPulse 2s infinite alternate ease-in-out;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes tourPulse {
-  0% {
-    box-shadow: 0 0 0 9999px rgba(15, 15, 20, 0.72), 0 0 0 4px rgba(65, 0, 244, 0.25), 0 0 16px rgba(65, 0, 244, 0.25);
-  }
-  100% {
-    box-shadow: 0 0 0 9999px rgba(15, 15, 20, 0.72), 0 0 0 6px rgba(65, 0, 244, 0.35), 0 0 28px rgba(65, 0, 244, 0.45);
-  }
-}
-
-/* Floating Tooltip Box */
+/* Floating Tooltip Card */
 .tour-tooltip-card {
   position: fixed;
   z-index: 10000;
@@ -43,7 +33,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-modal);
   padding: 20px;
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.25), 0 0 0 1px var(--color-border);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   font-family: var(--font-family);
   animation: tourFadeIn 0.25s ease-out;
@@ -70,7 +60,6 @@
 .tour-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   padding: 3px 8px;
   border-radius: var(--radius-pill);
   background: var(--color-primary-subtle);

@@ -379,7 +379,7 @@ export default function ResultsPage({ currentUser }) {
 
         <div style={{ display: 'flex', gap: '10px' }} id="tour-upload-actions">
           <button className="btn btn-secondary" onClick={() => setTourOpen(true)}>
-            <Sparkles size={14} style={{ color: 'var(--color-primary)' }} /> Take Guided Tour
+            Take Guided Tour
           </button>
           {(currentUser.role === 'Lecturer' || currentUser.role === 'Department Officer' || currentUser.role === 'Administrator') && (
             <>
