@@ -98,8 +98,8 @@ export default function LoginPage({ onLoginSuccess, demoUsers = [] }) {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label className="label">Username or Email Address</label>
-                <div style={{ position: 'relative' }}>
-                  <User size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--color-muted)' }} />
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)', zIndex: 1 }} />
                   <input
                     type="text"
                     className="form-control"
@@ -107,7 +107,7 @@ export default function LoginPage({ onLoginSuccess, demoUsers = [] }) {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
-                    style={{ paddingLeft: '38px' }}
+                    style={{ paddingLeft: '38px', width: '100%' }}
                   />
                 </div>
               </div>
