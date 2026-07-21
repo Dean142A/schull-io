@@ -414,9 +414,6 @@ export default function ResultsPage({ currentUser }) {
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }} id="tour-upload-actions">
-          <button className="btn btn-secondary" onClick={() => setTourOpen(true)}>
-            Take Guided Tour
-          </button>
           {(currentUser.role === 'Teacher' || currentUser.role === 'Supervisor' || currentUser.role === 'Administrator') && (
             <>
               <button className="btn btn-secondary" onClick={() => setSingleUploadOpen(true)}>

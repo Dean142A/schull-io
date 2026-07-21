@@ -271,9 +271,6 @@ export default function DirectoryPage({ currentUser }) {
         </div>
 
         <div style={{ display: 'flex', gap: '8px' }} id="tour-dir-actions">
-          <button className="btn btn-secondary" onClick={() => setTourOpen(true)}>
-            Take Guided Tour
-          </button>
           {isStaffManager && (
             <>
               {currentUser.role === 'Administrator' && (

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bell, ShieldAlert, FileText, CheckCircle, X, Check, ArrowRight } from 'lucide-react';
 
 export default function NotificationCenter({ currentUser }) {
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
   const [notifications, setNotifications] = useState([
     {
       id: 'notif-1',
@@ -30,6 +31,18 @@ export default function NotificationCenter({ currentUser }) {
     },
   ]);
 
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleMarkAllRead = () => {
@@ -41,7 +54,7 @@ export default function NotificationCenter({ currentUser }) {
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={dropdownRef} style={{ position: 'relative' }}>
       <button
         type="button"
         className="btn btn-secondary btn-sm"
@@ -86,7 +99,17 @@ export default function NotificationCenter({ currentUser }) {
           padding: '16px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--color-border)' }}>
-            <div style={{ fontWeight: 700, fontSize: '14px' }}>System Notifications</div>
+            <div style={{ fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>System Notifications</span>
+              <button 
+                type="button" 
+                onClick={() => setIsOpen(false)} 
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: '2px', display: 'inline-flex', alignItems: 'center' }}
+                title="Close notification panel"
+              >
+                <X size={14} />
+              </button>
+            </div>
             {unreadCount > 0 && (
               <button className="btn btn-tertiary" onClick={handleMarkAllRead} style={{ fontSize: '11px', padding: '2px 6px' }}>
                 <Check size={12} /> Mark all read

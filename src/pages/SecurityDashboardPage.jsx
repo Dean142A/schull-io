@@ -204,9 +204,6 @@ export default function SecurityDashboardPage({ currentUser }) {
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-secondary btn-sm" onClick={() => setTourOpen(true)}>
-            Take Guided Tour
-          </button>
           <button id="tour-sec-simulate" className="btn btn-danger btn-sm" onClick={handleSimulateAttack} title="Fires 6 simulated failed token attempts from IP 198.51.100.42">
             <ShieldAlert size={14} /> Simulate Brute-Force Attack
           </button>

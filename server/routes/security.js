@@ -159,6 +159,10 @@ router.get('/settings', (req, res) => {
     single_use_strictness: 'true',
     session_expiry_hours: '8',
     default_dispatch_channel: 'EMAIL',
+    token_dispatch_limit_daily: '5',
+    token_dispatch_cooldown_mins: '5',
+    auto_invalidate_previous_tokens: 'true',
+    disclaimer_template: 'SECURITY ADVISORY: This verification token is single-use and intended strictly for the parent or legal guardian. Do not forward or disclose raw verification tokens to unauthorized third parties.',
   };
 
   rows.forEach(r => {
@@ -177,6 +181,10 @@ router.put('/settings', (req, res) => {
     'single_use_strictness',
     'session_expiry_hours',
     'default_dispatch_channel',
+    'token_dispatch_limit_daily',
+    'token_dispatch_cooldown_mins',
+    'auto_invalidate_previous_tokens',
+    'disclaimer_template',
   ];
 
   const updated = [];

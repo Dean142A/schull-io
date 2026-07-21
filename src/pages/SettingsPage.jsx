@@ -17,6 +17,7 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
   const [setupPassword, setSetupPassword] = useState('');
   const [totpSetupActive, setTotpSetupActive] = useState(false);
   const [backupCodes, setBackupCodes] = useState([]);
+  const [showDisableForm, setShowDisableForm] = useState(false);
 
   // System Security Policies State
   const [systemSettings, setSystemSettings] = useState({
@@ -26,6 +27,10 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
     single_use_strictness: 'true',
     session_expiry_hours: '8',
     default_dispatch_channel: 'EMAIL',
+    token_dispatch_limit_daily: '5',
+    token_dispatch_cooldown_mins: '5',
+    auto_invalidate_previous_tokens: 'true',
+    disclaimer_template: 'SECURITY ADVISORY: This verification token is single-use and intended strictly for the parent or legal guardian. Do not forward or disclose raw verification tokens to unauthorized third parties.',
   });
 
   const [loading, setLoading] = useState(false);
@@ -182,6 +187,7 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
       setSuccess('2FA has been disabled.');
       setCurrentPassword('');
       setTotpCode('');
+      setShowDisableForm(false);
 
       if (onUpdateUser) {
         onUpdateUser({ ...currentUser, two_factor_enabled: 0 });
@@ -400,16 +406,25 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
                 <div style={{ fontWeight: 700 }}>2FA Protection Status</div>
                 <div className="caption">{currentUser?.two_factor_enabled === 1 ? 'Active & Enforced' : 'Not Active'}</div>
               </div>
-              <span className={`badge ${currentUser?.two_factor_enabled === 1 ? 'badge-published' : 'badge-draft'}`}>
-                {currentUser?.two_factor_enabled === 1 ? 'Enabled' : 'Disabled'}
-              </span>
+              <label className="switch-container">
+                <input
+                  type="checkbox"
+                  checked={currentUser?.two_factor_enabled === 1 || totpSetupActive}
+                  onChange={() => {
+                    if (currentUser?.two_factor_enabled === 0) {
+                      if (!totpSetupActive) {
+                        handleStart2faSetup();
+                      } else {
+                        setTotpSetupActive(false);
+                      }
+                    } else {
+                      setShowDisableForm(prev => !prev);
+                    }
+                  }}
+                />
+                <span className="switch-slider"></span>
+              </label>
             </div>
-
-            {currentUser?.two_factor_enabled === 0 && !totpSetupActive && (
-              <button className="btn btn-primary" onClick={handleStart2faSetup} disabled={loading}>
-                {loading ? 'Generating Key...' : 'Set Up 2FA Authenticator'}
-              </button>
-            )}
 
             {totpSetupActive && (
               <form onSubmit={handleEnable2fa} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -445,14 +460,14 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
               </form>
             )}
 
-            {currentUser?.two_factor_enabled === 1 && (
+            {currentUser?.two_factor_enabled === 1 && showDisableForm && (
               <form onSubmit={handleDisable2fa} style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
-                <h3 className="h3">Disable 2FA Protection</h3>
+                <h3 className="h3">Confirm to Disable 2FA</h3>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <input
                     type="password"
                     className="form-control"
-                    placeholder="Password"
+                    placeholder="Enter Password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     required
@@ -467,9 +482,14 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
                     required
                   />
                 </div>
-                <button type="submit" className="btn btn-danger" disabled={loading} style={{ alignSelf: 'flex-start' }}>
-                  Disable 2FA Security
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="submit" className="btn btn-danger" disabled={loading}>
+                    Disable 2FA Security
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowDisableForm(false)}>
+                    Cancel
+                  </button>
+                </div>
               </form>
             )}
           </div>
@@ -579,34 +599,79 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
 
       {/* TAB 4: Token Dispatch & Notifications */}
       {activeTab === 'notifications' && (
-        <div className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <form onSubmit={handlePoliciesSubmit} className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <h2 className="h2">Parent Dispatch & Notification Rules</h2>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <label className="label">Default Token Delivery Channel</label>
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="channel"
-                  value="EMAIL"
-                  checked={systemSettings.default_dispatch_channel === 'EMAIL'}
-                  onChange={() => setSystemSettings(prev => ({ ...prev, default_dispatch_channel: 'EMAIL' }))}
-                />
-                <span style={{ fontWeight: 600 }}>Parent Email Dispatch (Primary)</span>
-              </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <label className="label">Default Token Delivery Channel</label>
+              <div style={{ display: 'flex', gap: '16px', marginTop: '6px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="channel"
+                    value="EMAIL"
+                    checked={systemSettings.default_dispatch_channel === 'EMAIL'}
+                    onChange={() => setSystemSettings(prev => ({ ...prev, default_dispatch_channel: 'EMAIL' }))}
+                  />
+                  <span style={{ fontWeight: 600 }}>Parent Email Dispatch (Primary)</span>
+                </label>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="channel"
-                  value="SMS"
-                  checked={systemSettings.default_dispatch_channel === 'SMS'}
-                  onChange={() => setSystemSettings(prev => ({ ...prev, default_dispatch_channel: 'SMS' }))}
-                />
-                <span style={{ fontWeight: 600 }}>SMS Dispatch (Secondary)</span>
-              </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="channel"
+                    value="SMS"
+                    checked={systemSettings.default_dispatch_channel === 'SMS'}
+                    onChange={() => setSystemSettings(prev => ({ ...prev, default_dispatch_channel: 'SMS' }))}
+                  />
+                  <span style={{ fontWeight: 600 }}>SMS Dispatch (Secondary)</span>
+                </label>
+              </div>
             </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label className="label">Max Daily Token Dispatches per Student</label>
+              <select
+                className="form-control"
+                value={systemSettings.token_dispatch_limit_daily}
+                onChange={(e) => setSystemSettings(prev => ({ ...prev, token_dispatch_limit_daily: e.target.value }))}
+              >
+                <option value="3">3 Dispatches per Day</option>
+                <option value="5">5 Dispatches per Day (Standard)</option>
+                <option value="10">10 Dispatches per Day (High Volume)</option>
+              </select>
+              <span className="caption">Maximum tokens that can be requested per parent profile per 24 hours.</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label className="label">Consecutive Token Cooldown Duration</label>
+              <select
+                className="form-control"
+                value={systemSettings.token_dispatch_cooldown_mins}
+                onChange={(e) => setSystemSettings(prev => ({ ...prev, token_dispatch_cooldown_mins: e.target.value }))}
+              >
+                <option value="1">1 Minute</option>
+                <option value="5">5 Minutes (Standard)</option>
+                <option value="15">15 Minutes</option>
+              </select>
+              <span className="caption">Enforces a wait time between consecutive dispatches to prevent spam.</span>
+            </div>
+          </div>
+
+          <div style={{ padding: '16px', background: 'var(--color-canvas)', borderRadius: 'var(--radius-card)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontWeight: 700 }}>Auto-Invalidation of Previous Tokens</div>
+              <div className="caption">When a new token is generated, automatically invalidate any previous unused tokens for the same result.</div>
+            </div>
+            <label className="switch-container">
+              <input
+                type="checkbox"
+                checked={systemSettings.auto_invalidate_previous_tokens === 'true'}
+                onChange={(e) => setSystemSettings(prev => ({ ...prev, auto_invalidate_previous_tokens: e.target.checked ? 'true' : 'false' }))}
+              />
+              <span className="switch-slider"></span>
+            </label>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -614,14 +679,15 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
             <textarea
               className="form-control"
               rows={4}
-              defaultValue="SECURITY ADVISORY: This verification token is single-use and intended strictly for the parent or legal guardian. Do not forward or disclose raw verification tokens to unauthorized third parties."
+              value={systemSettings.disclaimer_template || ''}
+              onChange={(e) => setSystemSettings(prev => ({ ...prev, disclaimer_template: e.target.value }))}
             />
           </div>
 
-          <button className="btn btn-primary" onClick={handlePoliciesSubmit} disabled={loading} style={{ alignSelf: 'flex-start' }}>
+          <button type="submit" className="btn btn-primary" disabled={loading} style={{ alignSelf: 'flex-start' }}>
             Save Notification Rules
           </button>
-        </div>
+        </form>
       )}
     </div>
   );

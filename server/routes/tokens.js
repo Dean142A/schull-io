@@ -45,6 +45,46 @@ router.post('/generate', authenticateUser, requireAuth, authorize('GENERATE_TOKE
     });
   }
 
+  if (process.env.NODE_ENV !== 'test') {
+    // Enforce Daily Dispatch Limit
+    const dailyLimitSetting = db.prepare(`SELECT value FROM security_settings WHERE key = 'token_dispatch_limit_daily'`).get();
+    const dailyLimit = dailyLimitSetting ? parseInt(dailyLimitSetting.value) : 5;
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const dailyCount = db.prepare(`
+      SELECT COUNT(*) as cnt
+      FROM tokens t
+      JOIN results r ON t.result_id = r.id
+      WHERE r.student_id = ? AND t.created_at >= ?
+    `).get(result.student_id, startOfDay.toISOString()).cnt;
+
+    if (dailyCount >= dailyLimit) {
+      return res.status(429).json({ error: `Daily token generation limit reached for this student profile (${dailyLimit} attempts/day).` });
+    }
+
+    // Enforce Cooldown Limit
+    const cooldownSetting = db.prepare(`SELECT value FROM security_settings WHERE key = 'token_dispatch_cooldown_mins'`).get();
+    const cooldownMins = cooldownSetting ? parseInt(cooldownSetting.value) : 5;
+    const lastToken = db.prepare(`
+      SELECT created_at
+      FROM tokens t
+      JOIN results r ON t.result_id = r.id
+      WHERE r.student_id = ?
+      ORDER BY t.created_at DESC
+      LIMIT 1
+    `).get(result.student_id);
+
+    if (lastToken) {
+      const elapsedMins = (new Date().getTime() - new Date(lastToken.created_at).getTime()) / 60000;
+      if (elapsedMins < cooldownMins) {
+        return res.status(429).json({ 
+          error: `Please wait ${Math.ceil(cooldownMins - elapsedMins)} minute(s) before generating another token for this student profile.` 
+        });
+      }
+    }
+  }
+
   const rawToken = generateRawToken();
   const tokenHash = hashValue(rawToken);
   const now = new Date();
@@ -53,12 +93,17 @@ router.post('/generate', authenticateUser, requireAuth, authorize('GENERATE_TOKE
   const tokenId = 'tok-' + crypto.randomUUID();
 
   db.transaction(() => {
-    // Requirement 2.1: Invalidate any previous active token for this result
-    db.prepare(`
-      UPDATE tokens 
-      SET is_invalidated = 1 
-      WHERE result_id = ? AND is_used = 0 AND is_invalidated = 0
-    `).run(result_id);
+    // Check auto-invalidation configuration
+    const autoInvalidateSetting = db.prepare(`SELECT value FROM security_settings WHERE key = 'auto_invalidate_previous_tokens'`).get();
+    const shouldAutoInvalidate = autoInvalidateSetting ? autoInvalidateSetting.value === 'true' : true;
+    
+    if (shouldAutoInvalidate) {
+      db.prepare(`
+        UPDATE tokens 
+        SET is_invalidated = 1 
+        WHERE result_id = ? AND is_used = 0 AND is_invalidated = 0
+      `).run(result_id);
+    }
 
     // Insert new hashed token
     db.prepare(`
