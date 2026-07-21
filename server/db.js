@@ -223,12 +223,22 @@ export function initDb() {
   safeMigrate(`ALTER TABLE tokens ADD COLUMN dispatched_at TEXT;`);
   safeMigrate(`ALTER TABLE tokens ADD COLUMN dispatched_to TEXT;`);
 
-  // Ensure demo user emails are populated
-  db.prepare(`UPDATE users SET email = 'admin@schull.io' WHERE username = 'admin' AND (email IS NULL OR email = '')`).run();
-  db.prepare(`UPDATE users SET email = 'cs_officer@schull.io' WHERE username = 'cs_officer' AND (email IS NULL OR email = '')`).run();
-  db.prepare(`UPDATE users SET email = 'math_officer@schull.io' WHERE username = 'math_officer' AND (email IS NULL OR email = '')`).run();
-  db.prepare(`UPDATE users SET email = 'cs_lecturer1@schull.io' WHERE username = 'cs_lecturer1' AND (email IS NULL OR email = '')`).run();
-  db.prepare(`UPDATE users SET email = 'math_lecturer1@schull.io' WHERE username = 'math_lecturer1' AND (email IS NULL OR email = '')`).run();
+  // Ensure demo user emails are populated and accounts are unlocked with default password hash
+  const defaultPasswordHash = hashPassword('password123');
+  const demoUsers = [
+    { username: 'admin', email: 'admin@schull.io', name: 'System Administrator (Ogude Dean)', role: 'Administrator', dept: null },
+    { username: 'cs_officer', email: 'cs_officer@schull.io', name: 'Dr. Sarah Connor', role: 'Department Officer', dept: 'dept-cs' },
+    { username: 'math_officer', email: 'math_officer@schull.io', name: 'Prof. Alan Turing', role: 'Department Officer', dept: 'dept-math' },
+    { username: 'cs_lecturer1', email: 'cs_lecturer1@schull.io', name: 'Dr. Grace Hopper', role: 'Lecturer', dept: 'dept-cs' },
+    { username: 'math_lecturer1', email: 'math_lecturer1@schull.io', name: 'Dr. Katherine Johnson', role: 'Lecturer', dept: 'dept-math' },
+  ];
+
+  for (const demo of demoUsers) {
+    const existing = db.prepare(`SELECT id FROM users WHERE username = ?`).get(demo.username);
+    if (existing) {
+      db.prepare(`UPDATE users SET email = ?, password_hash = ?, failed_login_attempts = 0, locked_until = NULL, is_active = 1 WHERE username = ?`).run(demo.email, defaultPasswordHash, demo.username);
+    }
+  }
 
   // Seed Data if empty
   const userCount = db.prepare(`SELECT count(*) as count FROM users`).get();

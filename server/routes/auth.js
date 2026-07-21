@@ -30,12 +30,13 @@ router.post('/login', loginRateLimiter, (req, res) => {
   }
 
   const loginInput = username ? username.trim() : '';
+  const cleanPassword = password ? password.trim() : '';
 
   const user = db.prepare(`
     SELECT u.*, d.name as department_name, d.code as department_code
     FROM users u
     LEFT JOIN departments d ON u.department_id = d.id
-    WHERE u.username = ? OR u.email = ?
+    WHERE LOWER(u.username) = LOWER(?) OR LOWER(u.email) = LOWER(?)
   `).get(loginInput, loginInput);
 
   if (user && user.locked_until && new Date() < new Date(user.locked_until)) {
@@ -44,7 +45,7 @@ router.post('/login', loginRateLimiter, (req, res) => {
     return res.status(429).json({ error: 'Account temporarily locked due to 5 consecutive failed login attempts. Contact an Administrator to unlock.' });
   }
 
-  const isPasswordValid = user ? comparePassword(password, user.password_hash) : false;
+  const isPasswordValid = user ? comparePassword(cleanPassword, user.password_hash) : false;
 
   if (!user || !isPasswordValid || user.is_active === 0) {
     recordFailedLoginAttempt(ip);
