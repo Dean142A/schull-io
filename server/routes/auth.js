@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import db, { comparePassword } from '../db.js';
 import { recordAuditLog } from '../middleware/auditLogger.js';
 import { authenticateUser, JWT_SECRET } from '../middleware/auth.js';
+import { loginRateLimiter, recordFailedLoginAttempt } from '../middleware/rateLimiter.js';
 import { generateBase32Secret, generateTotpCode, verifyTotpCode } from '../utils/totp.js';
 
 const router = express.Router();
@@ -17,11 +18,14 @@ router.get('/demo-users', (req, res) => {
   res.json(users);
 });
 
-// POST /api/auth/login - Strict production authentication
-router.post('/login', (req, res) => {
+// POST /api/auth/login - Strict production authentication with IP rate limiting & per-account lockout
+router.post('/login', loginRateLimiter, (req, res) => {
   const { username, password, totp_code } = req.body;
+  const forwarded = req.headers['x-forwarded-for'];
+  const ip = forwarded ? forwarded.split(',')[0].trim() : (req.ip || req.socket?.remoteAddress || '127.0.0.1');
 
   if (!username || !password) {
+    recordFailedLoginAttempt(ip);
     return res.status(400).json({ error: 'Username and password are required' });
   }
 
@@ -33,6 +37,7 @@ router.post('/login', (req, res) => {
   `).get(username);
 
   if (user && user.locked_until && new Date() < new Date(user.locked_until)) {
+    recordFailedLoginAttempt(ip);
     recordAuditLog(req, 'LOGIN_BLOCKED_LOCKED', { username }, { id: 'anonymous', full_name: username, role: 'Guest', department_id: null });
     return res.status(429).json({ error: 'Account temporarily locked due to 5 consecutive failed login attempts. Contact an Administrator to unlock.' });
   }
@@ -40,6 +45,7 @@ router.post('/login', (req, res) => {
   const isPasswordValid = user ? comparePassword(password, user.password_hash) : false;
 
   if (!user || !isPasswordValid || user.is_active === 0) {
+    recordFailedLoginAttempt(ip);
     if (user) {
       const attempts = (user.failed_login_attempts || 0) + 1;
       if (attempts >= 5) {
@@ -68,7 +74,18 @@ router.post('/login', (req, res) => {
 
     const isTotpValid = verifyTotpCode(user.two_factor_secret, totp_code);
     if (!isTotpValid) {
-      recordAuditLog(req, 'LOGIN_FAILED_2FA', { username: user.username, reason: 'Invalid 2FA TOTP code' }, user);
+      recordFailedLoginAttempt(ip);
+      const attempts = (user.failed_login_attempts || 0) + 1;
+      if (attempts >= 5) {
+        const lockTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+        db.prepare(`UPDATE users SET failed_login_attempts = ?, locked_until = ? WHERE id = ?`).run(attempts, lockTime, user.id);
+        recordAuditLog(req, 'ACCOUNT_LOCKED', { username: user.username, attempts, lock_until: lockTime }, user);
+        return res.status(429).json({ error: 'Account locked due to 5 consecutive failed login attempts. Contact an Administrator to unlock.' });
+      } else {
+        db.prepare(`UPDATE users SET failed_login_attempts = ? WHERE id = ?`).run(attempts, user.id);
+      }
+
+      recordAuditLog(req, 'LOGIN_FAILED_2FA', { username: user.username, reason: 'Invalid 2FA TOTP code', attempts }, user);
       return res.status(401).json({ error: 'Invalid 2FA authentication code. Please check your authenticator app.' });
     }
   }
@@ -92,7 +109,7 @@ router.post('/login', (req, res) => {
   });
 
   // Audit successful login attempt
-  recordAuditLog(req, 'LOGIN_SUCCESS', { username: user.username, role: user.role }, user);
+  recordAuditLog(req, 'LOGIN_SUCCESS', { role: user.role }, user);
 
   res.json({
     message: 'Login successful',
@@ -104,19 +121,20 @@ router.post('/login', (req, res) => {
       department_id: user.department_id,
       department_name: user.department_name,
       department_code: user.department_code,
+      two_factor_enabled: user.two_factor_enabled,
     }
   });
 });
 
-// POST /api/auth/dev-switch-user - Isolated Development Role Switcher (Disabled in Production)
+// POST /api/auth/dev-switch-user (Development / Demo role switcher ONLY)
 router.post('/dev-switch-user', (req, res) => {
   if (process.env.NODE_ENV === 'production') {
-    return res.status(403).json({ error: 'Forbidden: Development role switcher is disabled in production.' });
+    return res.status(403).json({ error: 'Role switcher is disabled in production environments.' });
   }
 
-  const { userId } = req.body;
-  if (!userId) {
-    return res.status(400).json({ error: 'userId parameter required' });
+  const targetUserId = req.body.targetUserId || req.body.userId;
+  if (!targetUserId) {
+    return res.status(400).json({ error: 'targetUserId or userId is required' });
   }
 
   const user = db.prepare(`
@@ -124,10 +142,10 @@ router.post('/dev-switch-user', (req, res) => {
     FROM users u
     LEFT JOIN departments d ON u.department_id = d.id
     WHERE u.id = ?
-  `).get(userId);
+  `).get(targetUserId);
 
   if (!user || user.is_active === 0) {
-    return res.status(404).json({ error: 'User not found or deactivated' });
+    return res.status(401).json({ error: 'User not found or account deactivated' });
   }
 
   const token = jwt.sign(
@@ -155,6 +173,7 @@ router.post('/dev-switch-user', (req, res) => {
       department_id: user.department_id,
       department_name: user.department_name,
       department_code: user.department_code,
+      two_factor_enabled: user.two_factor_enabled,
     }
   });
 });
@@ -185,16 +204,35 @@ router.get('/me', authenticateUser, (req, res) => {
   res.json({ user });
 });
 
-// POST /api/auth/2fa/setup - Generate 2FA Secret Key
+// POST /api/auth/2fa/setup - Generate 2FA Secret Key (with re-setup safeguard)
 router.post('/2fa/setup', authenticateUser, (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  const secret = generateBase32Secret(20);
-  const otpauthUrl = `otpauth://totp/schull:${req.user.username}?secret=${secret}&issuer=schull.io`;
+  const user = db.prepare(`SELECT * FROM users WHERE id = ?`).get(req.user.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
 
-  db.prepare(`UPDATE users SET two_factor_secret = ? WHERE id = ?`).run(secret, req.user.id);
+  // Safeguard: Re-setting 2FA on an already-enabled account requires password + current TOTP code proof!
+  if (user.two_factor_enabled === 1) {
+    const { password, current_totp_code } = req.body;
+    if (!password || !current_totp_code) {
+      return res.status(400).json({ error: 'Re-configuring 2FA on an enabled account requires current account password and current 2FA TOTP code.' });
+    }
+    const isPasswordValid = comparePassword(password, user.password_hash);
+    const isTotpValid = verifyTotpCode(user.two_factor_secret, current_totp_code);
+    if (!isPasswordValid || !isTotpValid) {
+      return res.status(401).json({ error: 'Invalid account password or current 2FA verification code. Cannot re-configure 2FA secret.' });
+    }
+  }
+
+  const secret = generateBase32Secret(20);
+  const otpauthUrl = `otpauth://totp/schull:${user.username}?secret=${secret}&issuer=schull.io`;
+
+  // Store in two_factor_pending_secret without disrupting active two_factor_secret
+  db.prepare(`UPDATE users SET two_factor_pending_secret = ? WHERE id = ?`).run(secret, user.id);
 
   res.json({
     secret,
@@ -210,18 +248,20 @@ router.post('/2fa/enable', authenticateUser, (req, res) => {
   }
 
   const { totp_code } = req.body;
-  const user = db.prepare(`SELECT two_factor_secret FROM users WHERE id = ?`).get(req.user.id);
+  const user = db.prepare(`SELECT two_factor_secret, two_factor_pending_secret FROM users WHERE id = ?`).get(req.user.id);
 
-  if (!user || !user.two_factor_secret) {
+  const candidateSecret = user?.two_factor_pending_secret || user?.two_factor_secret;
+
+  if (!user || !candidateSecret) {
     return res.status(400).json({ error: 'Please generate a 2FA secret key first.' });
   }
 
-  const isValid = verifyTotpCode(user.two_factor_secret, totp_code);
+  const isValid = verifyTotpCode(candidateSecret, totp_code);
   if (!isValid) {
     return res.status(400).json({ error: 'Invalid 2FA verification code. Check your authenticator app.' });
   }
 
-  db.prepare(`UPDATE users SET two_factor_enabled = 1 WHERE id = ?`).run(req.user.id);
+  db.prepare(`UPDATE users SET two_factor_secret = ?, two_factor_pending_secret = null, two_factor_enabled = 1 WHERE id = ?`).run(candidateSecret, req.user.id);
   recordAuditLog(req, '2FA_ENABLED', { user_id: req.user.id });
 
   res.json({ message: 'Two-factor authentication enabled successfully.' });
@@ -244,7 +284,7 @@ router.post('/2fa/disable', authenticateUser, (req, res) => {
     return res.status(400).json({ error: 'Invalid 2FA code.' });
   }
 
-  db.prepare(`UPDATE users SET two_factor_enabled = 0, two_factor_secret = null WHERE id = ?`).run(req.user.id);
+  db.prepare(`UPDATE users SET two_factor_enabled = 0, two_factor_secret = null, two_factor_pending_secret = null WHERE id = ?`).run(req.user.id);
   recordAuditLog(req, '2FA_DISABLED', { user_id: req.user.id });
 
   res.json({ message: 'Two-factor authentication disabled.' });

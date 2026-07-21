@@ -25,6 +25,24 @@ export function recordFailedTokenAttempt(ip) {
   return newCount;
 }
 
+export function recordFailedLoginAttempt(ip) {
+  const nowStr = new Date().toISOString();
+  const existing = db.prepare(`SELECT attempt_count, last_attempt FROM login_rate_limits WHERE ip_address = ?`).get(ip);
+
+  let newCount = 1;
+  if (existing) {
+    const elapsed = Date.now() - new Date(existing.last_attempt).getTime();
+    newCount = elapsed < WINDOW_MS ? existing.attempt_count + 1 : 1;
+  }
+
+  db.prepare(`
+    INSERT OR REPLACE INTO login_rate_limits (ip_address, attempt_count, last_attempt)
+    VALUES (?, ?, ?)
+  `).run(ip, newCount, nowStr);
+
+  return newCount;
+}
+
 export function tokenRateLimiter(req, res, next) {
   const forwarded = req.headers['x-forwarded-for'];
   const ip = forwarded ? forwarded.split(',')[0].trim() : (req.ip || req.socket?.remoteAddress || '127.0.0.1');
@@ -46,6 +64,34 @@ export function tokenRateLimiter(req, res, next) {
     if (elapsed < WINDOW_MS && record.attempt_count >= threshold) {
       return res.status(429).json({
         error: 'Rate limit exceeded: Too many invalid token attempts from your IP address. Please try again later.'
+      });
+    }
+  }
+
+  next();
+}
+
+export function loginRateLimiter(req, res, next) {
+  const forwarded = req.headers['x-forwarded-for'];
+  const ip = forwarded ? forwarded.split(',')[0].trim() : (req.ip || req.socket?.remoteAddress || '127.0.0.1');
+
+  // 1. Check if IP is in manual blocklist
+  const blocked = db.prepare(`SELECT reason FROM ip_blocklist WHERE ip_address = ?`).get(ip);
+  if (blocked) {
+    return res.status(403).json({
+      error: `Access Denied: Your IP address has been blocked by system administrators. Reason: ${blocked.reason}`
+    });
+  }
+
+  // 2. Check IP rate limit for login attempts (10 attempts per 15 mins)
+  const threshold = 10;
+  const record = db.prepare(`SELECT attempt_count, last_attempt FROM login_rate_limits WHERE ip_address = ?`).get(ip);
+
+  if (record) {
+    const elapsed = Date.now() - new Date(record.last_attempt).getTime();
+    if (elapsed < WINDOW_MS && record.attempt_count >= threshold) {
+      return res.status(429).json({
+        error: 'Rate limit exceeded: Too many failed authentication attempts from your IP address. Please try again later.'
       });
     }
   }

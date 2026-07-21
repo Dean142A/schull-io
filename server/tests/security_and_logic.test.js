@@ -46,6 +46,9 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       DROP TABLE IF EXISTS users;
       DROP TABLE IF EXISTS departments;
       DROP TABLE IF EXISTS security_settings;
+      DROP TABLE IF EXISTS ip_rate_limits;
+      DROP TABLE IF EXISTS login_rate_limits;
+      DROP TABLE IF EXISTS ip_blocklist;
     `);
     db.pragma('foreign_keys = ON');
     initDb();
@@ -432,6 +435,23 @@ describe('schull.io Security & System Correctness Test Suite', () => {
         .send({ username: 'cs_lecturer1', password: 'password123' });
 
       expect(login1.body.requires_2fa).toBe(true);
+
+      // Attempt login with invalid 2FA code (increments failed attempt counter)
+      const invalid2fa = await request(app)
+        .post('/api/auth/login')
+        .send({ username: 'cs_lecturer1', password: 'password123', totp_code: '000000' });
+
+      expect(invalid2fa.status).toBe(401);
+      expect(invalid2fa.body.error).toMatch(/Invalid 2FA authentication code/i);
+
+      // Attempt 2FA re-setup without password / current code proof (rejected with 400)
+      const unauthResetup = await request(app)
+        .post('/api/auth/2fa/setup')
+        .set('Cookie', csLecturerCookie)
+        .send({});
+
+      expect(unauthResetup.status).toBe(400);
+      expect(unauthResetup.body.error).toMatch(/Re-configuring 2FA/i);
 
       // Attempt login with valid 2FA code (succeeds with set-cookie)
       const login2 = await request(app)

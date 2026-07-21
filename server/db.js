@@ -162,6 +162,12 @@ export function initDb() {
       last_attempt TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS login_rate_limits (
+      ip_address TEXT PRIMARY KEY,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      last_attempt TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS ip_blocklist (
       ip_address TEXT PRIMARY KEY,
       reason TEXT NOT NULL,
@@ -212,6 +218,7 @@ export function initDb() {
   safeMigrate(`ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;`);
   safeMigrate(`ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0;`);
   safeMigrate(`ALTER TABLE users ADD COLUMN locked_until TEXT;`);
+  safeMigrate(`ALTER TABLE users ADD COLUMN two_factor_pending_secret TEXT;`);
   safeMigrate(`ALTER TABLE tokens ADD COLUMN dispatched_at TEXT;`);
   safeMigrate(`ALTER TABLE tokens ADD COLUMN dispatched_to TEXT;`);
 
