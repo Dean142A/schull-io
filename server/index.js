@@ -23,7 +23,21 @@ initDb();
 
 // Middlewares
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: true, credentials: true }));
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS policy violation: Origin '${origin}' is not permitted.`));
+    }
+  },
+  credentials: true,
+}));
 app.use(cookieParser());
 app.use(express.json());
 

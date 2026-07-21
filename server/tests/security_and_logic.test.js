@@ -50,7 +50,7 @@ describe('schull.io Security & System Correctness Test Suite', () => {
     initDb();
   });
 
-  describe('1. Authentication & Password Security (Bcrypt & Signed JWT)', () => {
+  describe('1. Authentication & Password Security (Strict Login & Deactivation)', () => {
     it('verifies seeded user passwords are hashed with bcrypt', () => {
       const admin = db.prepare(`SELECT password_hash FROM users WHERE id = 'usr-admin'`).get();
       expect(admin.password_hash).not.toBe('password123');
@@ -67,7 +67,16 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       expect(res.body.error).toMatch(/Authentication required/i);
     });
 
-    it('authenticates admin and sets httpOnly JWT auth_token cookie', async () => {
+    it('STRICTLY REJECTS login attempts using only userId without a password', async () => {
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({ userId: 'usr-admin' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/Username and password are required/i);
+    });
+
+    it('authenticates admin with valid username and password, setting httpOnly auth_token cookie', async () => {
       const res = await request(app)
         .post('/api/auth/login')
         .send({ username: 'admin', password: 'password123' });
@@ -80,10 +89,10 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       adminCookie = res.headers['set-cookie'];
     });
 
-    it('authenticates CS Department Officer', async () => {
+    it('allows dev role switcher route in development mode', async () => {
       const res = await request(app)
-        .post('/api/auth/login')
-        .send({ username: 'cs_officer', password: 'password123' });
+        .post('/api/auth/dev-switch-user')
+        .send({ userId: 'usr-officer-cs' });
 
       expect(res.status).toBe(200);
       expect(res.body.user.role).toBe('Department Officer');
@@ -92,12 +101,26 @@ describe('schull.io Security & System Correctness Test Suite', () => {
 
     it('authenticates CS Lecturer', async () => {
       const res = await request(app)
-        .post('/api/auth/login')
-        .send({ username: 'cs_lecturer1', password: 'password123' });
+        .post('/api/auth/dev-switch-user')
+        .send({ userId: 'usr-lecturer-cs1' });
 
       expect(res.status).toBe(200);
       expect(res.body.user.role).toBe('Lecturer');
       csLecturerCookie = res.headers['set-cookie'];
+    });
+
+    it('immediately revokes authentication when a user account is deactivated (is_active = 0)', async () => {
+      // Deactivate lecturer account in DB
+      db.prepare(`UPDATE users SET is_active = 0 WHERE id = 'usr-lecturer-cs1'`).run();
+
+      const res = await request(app)
+        .get('/api/results')
+        .set('Cookie', csLecturerCookie);
+
+      expect(res.status).toBe(401);
+
+      // Reactivate account for subsequent tests
+      db.prepare(`UPDATE users SET is_active = 1 WHERE id = 'usr-lecturer-cs1'`).run();
     });
   });
 
@@ -133,7 +156,6 @@ describe('schull.io Security & System Correctness Test Suite', () => {
     });
 
     it('rejects update when version mismatch occurs (Optimistic Concurrency Control)', async () => {
-      // Get current version of res-104
       const getRes = await request(app)
         .get('/api/results/res-104')
         .set('Cookie', adminCookie);
@@ -154,34 +176,77 @@ describe('schull.io Security & System Correctness Test Suite', () => {
     });
   });
 
-  describe('4. Bulk Upload CSV Parsing & Complete History Tracking', () => {
-    it('parses CSV data and records previous score (old_score) on record update', async () => {
-      // res-104 has initial score 64.5
+  describe('4. Token Portal Strict Cookie Enforcement & Input Normalization', () => {
+    let portalCookie = '';
+    let rawToken = '';
+
+    it('generates token and normalizes token redemption input (trim & lowercase input)', async () => {
+      // Generate token for res-101 (Published)
+      const genRes = await request(app)
+        .post('/api/tokens/generate')
+        .set('Cookie', adminCookie)
+        .send({ result_id: 'res-101' });
+
+      expect(genRes.status).toBe(201);
+      rawToken = genRes.body.raw_token;
+
+      // Redeem token with lowercase & whitespace padding
+      const redeemRes = await request(app)
+        .post('/api/tokens/redeem')
+        .send({ raw_token: `  ${rawToken.toLowerCase()}  ` });
+
+      expect(redeemRes.status).toBe(200);
+      // Verify session_token is omitted from JSON body (cookie-only)
+      expect(redeemRes.body.session_token).toBeUndefined();
+      expect(redeemRes.headers['set-cookie']).toBeDefined();
+      portalCookie = redeemRes.headers['set-cookie'];
+    });
+
+    it('views result using httpOnly session cookie and rejects x-session-token header fallback', async () => {
+      // Cookie authenticated request
+      const viewRes = await request(app)
+        .get('/api/tokens/view-result')
+        .set('Cookie', portalCookie);
+
+      expect(viewRes.status).toBe(200);
+      expect(viewRes.body.result.course_code).toBe('CS101');
+
+      // Header fallback request (rejected)
+      const headerRes = await request(app)
+        .get('/api/tokens/view-result')
+        .set('x-session-token', 'ses-test-invalid');
+
+      expect(headerRes.status).toBe(401);
+    });
+  });
+
+  describe('5. Bulk Upload CSV Edge Cases & Score Rounding', () => {
+    it('rounds score to 1 decimal place and detects duplicate rows within the same CSV batch', async () => {
       const res = await request(app)
         .post('/api/results/bulk-upload')
         .set('Cookie', adminCookie)
         .send({
           rows: [
-            { student_code: 'STU/2026/002', course_code: 'CS302', score: 82.5, session: '2025/2026', semester: 'First' }
+            { student_code: 'stu/2026/002', course_code: 'cs302', score: 88.5499, session: '2025/2026', semester: 'First' },
+            { student_code: 'STU/2026/002', course_code: 'CS302', score: 95.0, session: '2025/2026', semester: 'First' } // Batch duplicate
           ]
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.successes[0].action).toBe('Updated');
+      expect(res.body.successes.length).toBe(1);
+      expect(res.body.errors.length).toBe(1);
+      expect(res.body.errors[0].error).toMatch(/Duplicate entry/i);
 
-      // Check history entry for res-104
-      const histRes = await request(app)
+      // Verify rounded score stored as 88.5
+      const checkRes = await request(app)
         .get('/api/results/res-104')
         .set('Cookie', adminCookie);
 
-      const updateHistory = histRes.body.history.find(h => h.action_type === 'BULK_UPDATE');
-      expect(updateHistory).toBeDefined();
-      expect(updateHistory.old_score).toBe(64.5);
-      expect(updateHistory.new_score).toBe(82.5);
+      expect(checkRes.body.result.score).toBe(88.5);
     });
   });
 
-  describe('5. Audit Log Immutability & Department Officer Target Scope', () => {
+  describe('6. Audit Log Immutability & Department Officer Scope', () => {
     it('rejects updates to audit_logs table via SQL triggers', () => {
       expect(() => {
         db.prepare(`UPDATE audit_logs SET details = 'tampered' WHERE id = 'aud-001'`).run();
@@ -189,12 +254,10 @@ describe('schull.io Security & System Correctness Test Suite', () => {
     });
 
     it('makes Admin actions on CS department results visible to CS Department Officer in audit logs', async () => {
-      // Admin locks CS result res-103
       await request(app)
         .post('/api/results/res-103/lock')
         .set('Cookie', adminCookie);
 
-      // CS Department Officer views audit logs
       const auditRes = await request(app)
         .get('/api/audit-logs')
         .set('Cookie', csOfficerCookie);

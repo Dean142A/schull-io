@@ -47,6 +47,7 @@ export function initDb() {
       full_name TEXT NOT NULL,
       role TEXT NOT NULL CHECK(role IN ('Administrator', 'Lecturer', 'Department Officer', 'Parent/Student Viewer')),
       department_id TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
       two_factor_enabled INTEGER NOT NULL DEFAULT 0,
       two_factor_secret TEXT,
       FOREIGN KEY(department_id) REFERENCES departments(id)
@@ -171,6 +172,13 @@ export function initDb() {
   const setTokenExpiry = db.prepare(`INSERT OR IGNORE INTO security_settings (key, value) VALUES ('token_expiry_hours', '24')`);
   setThreshold.run();
   setTokenExpiry.run();
+
+  // Column Migration
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;`);
+  } catch (e) {
+    // Column already exists
+  }
 
   // Seed Data if empty
   const userCount = db.prepare(`SELECT count(*) as count FROM users`).get();

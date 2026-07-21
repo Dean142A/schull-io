@@ -38,12 +38,12 @@ export default function App() {
         setCurrentUser(data.user);
       })
       .catch(() => {
-        // Fallback: Login default admin to obtain valid JWT session
+        // Fallback: Login default admin using real credentials to obtain valid JWT session
         fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ userId: 'usr-admin' }),
+          body: JSON.stringify({ username: 'admin', password: 'password123' }),
         })
           .then(res => res.json())
           .then(data => {
@@ -56,7 +56,7 @@ export default function App() {
 
   const handleSwitchUser = async (user) => {
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch('/api/auth/dev-switch-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

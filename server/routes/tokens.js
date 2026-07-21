@@ -125,7 +125,9 @@ router.post('/redeem', tokenRateLimiter, (req, res) => {
     return res.status(400).json({ error: 'Invalid or expired token. Please request a new token from your department officer.' });
   }
 
-  const tokenHash = hashValue(raw_token.trim());
+  // Input Normalization: Trim and uppercase token before hashing
+  const normalizedToken = raw_token.trim().toUpperCase();
+  const tokenHash = hashValue(normalizedToken);
 
   // Search DB for token
   const tokenRecord = db.prepare(`SELECT * FROM tokens WHERE token_hash = ?`).get(tokenHash);
@@ -197,7 +199,7 @@ router.post('/redeem', tokenRateLimiter, (req, res) => {
     });
   })();
 
-  // Set httpOnly cookie for session token
+  // Set httpOnly cookie for session token (strictly cookie-only)
   res.cookie('schull_session_token', sessionToken, {
     httpOnly: true,
     sameSite: 'strict',
@@ -206,7 +208,6 @@ router.post('/redeem', tokenRateLimiter, (req, res) => {
 
   res.json({
     message: 'Token redeemed successfully.',
-    session_token: sessionToken,
     expires_at: sessionExpiresAt,
   });
 });
@@ -220,7 +221,7 @@ router.post('/exit-session', (req, res) => {
 // GET /api/tokens/view-result - Session-authenticated result viewing
 // Requirement 2.4: On every request within an active session, the system re-verifies the underlying result is still "Published", so an admin unpublishing mid-session takes effect immediately.
 router.get('/view-result', (req, res) => {
-  const sessionToken = req.cookies?.schull_session_token || req.headers['x-session-token'];
+  const sessionToken = req.cookies?.schull_session_token;
 
   if (!sessionToken) {
     return res.status(401).json({ error: 'Session token required' });

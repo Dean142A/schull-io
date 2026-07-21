@@ -133,7 +133,7 @@ router.post('/', authorize('MODIFY_RESULTS'), (req, res) => {
     return res.status(403).json({ error: 'Forbidden: Course is outside your department.' });
   }
 
-  const numScore = parseFloat(score);
+  const numScore = Math.round(parseFloat(score) * 10) / 10;
   if (isNaN(numScore) || numScore < 0 || numScore > 100) {
     return res.status(400).json({ error: 'Invalid score value (must be 0–100)' });
   }
@@ -199,32 +199,45 @@ router.post('/bulk-upload', authorize('MODIFY_RESULTS'), upload.single('file'), 
 
   const successReports = [];
   const errorReports = [];
+  const seenInBatch = new Set();
 
   for (const row of rows) {
     try {
-      const student_code = row.student_code;
-      const course_code = row.course_code;
-      const session = row.session || '2025/2026';
-      const semester = row.semester || 'First';
-      const score = parseFloat(row.score);
+      const student_code = row.student_code?.trim();
+      const course_code = row.course_code?.trim();
+      const session = row.session?.trim() || '2025/2026';
+      const semester = row.semester?.trim() || 'First';
+      const rawScore = parseFloat(row.score);
 
-      if (!student_code || !course_code || isNaN(score)) {
+      if (!student_code || !course_code || isNaN(rawScore)) {
         errorReports.push({ row: row.rowIndex, error: 'Missing student_code, course_code, or numeric score' });
         continue;
       }
+
+      const score = Math.round(rawScore * 10) / 10;
 
       if (score < 0 || score > 100) {
         errorReports.push({ row: row.rowIndex, error: `Invalid score ${score} (must be 0-100)` });
         continue;
       }
 
-      const student = db.prepare(`SELECT id, department_id FROM students WHERE student_code = ?`).get(student_code);
+      // Batch Duplicate Detection
+      const batchKey = `${student_code.toUpperCase()}_${course_code.toUpperCase()}_${session}_${semester}`;
+      if (seenInBatch.has(batchKey)) {
+        errorReports.push({ row: row.rowIndex, error: `Duplicate entry for student '${student_code}' and course '${course_code}' in the same upload batch.` });
+        continue;
+      }
+      seenInBatch.add(batchKey);
+
+      // Case-Insensitive Student Lookup
+      const student = db.prepare(`SELECT id, department_id FROM students WHERE UPPER(student_code) = UPPER(?)`).get(student_code);
       if (!student) {
         errorReports.push({ row: row.rowIndex, error: `Student code '${student_code}' not found` });
         continue;
       }
 
-      const course = db.prepare(`SELECT id, department_id, lecturer_id FROM courses WHERE code = ?`).get(course_code);
+      // Case-Insensitive Course Lookup
+      const course = db.prepare(`SELECT id, department_id, lecturer_id FROM courses WHERE UPPER(code) = UPPER(?)`).get(course_code);
       if (!course) {
         errorReports.push({ row: row.rowIndex, error: `Course code '${course_code}' not found` });
         continue;
@@ -342,7 +355,7 @@ router.put('/:id', authorize('MODIFY_RESULTS'), (req, res) => {
     return res.status(400).json({ error: 'Administrator override reason is mandatory when modifying a Locked or Published result.' });
   }
 
-  const numScore = parseFloat(score);
+  const numScore = Math.round(parseFloat(score) * 10) / 10;
   const grade = calculateGrade(numScore);
   const newVersion = existing.version + 1;
 

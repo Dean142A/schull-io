@@ -1,7 +1,12 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import db from '../db.js';
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'schull-secure-jwt-secret-key-2026';
+export const JWT_SECRET = process.env.JWT_SECRET || (
+  process.env.NODE_ENV === 'production'
+    ? (() => { throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable must be set in production mode.'); })()
+    : crypto.randomBytes(32).toString('hex')
+);
 
 // Permissions Matrix per Section 2.2
 export const PERMISSIONS = {
@@ -18,7 +23,7 @@ export const PERMISSIONS = {
 /**
  * Authentication Middleware: Verifies signed JWT token from cookie or Authorization header,
  * then fetches fresh user data from DB on every request.
- * Ensures role/department reassignments take effect on next request immediately.
+ * Ensures role/department reassignments or account deactivations take effect on next request immediately.
  */
 export function authenticateUser(req, res, next) {
   let token = req.cookies?.auth_token;
@@ -36,9 +41,13 @@ export function authenticateUser(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
     const userId = decoded.id || decoded.userId;
 
-    // Fetch live user record directly from database
-    const user = db.prepare(`SELECT id, username, full_name, role, department_id FROM users WHERE id = ?`).get(userId);
-    req.user = user || null;
+    // Fetch live user record directly from database and verify account is active
+    const user = db.prepare(`SELECT id, username, full_name, role, department_id, is_active FROM users WHERE id = ?`).get(userId);
+    if (!user || user.is_active === 0) {
+      req.user = null;
+    } else {
+      req.user = user;
+    }
   } catch (err) {
     // Invalid or expired token
     req.user = null;
