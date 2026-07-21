@@ -186,9 +186,19 @@ export function initDb() {
   setTokenExpiry.run();
 
   // Column Migrations
-  try { db.exec(`ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;`); } catch (e) {}
-  try { db.exec(`ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0;`); } catch (e) {}
-  try { db.exec(`ALTER TABLE users ADD COLUMN locked_until TEXT;`); } catch (e) {}
+  const safeMigrate = (sql) => {
+    try {
+      db.exec(sql);
+    } catch (e) {
+      if (!e.message?.includes('duplicate column') && !e.message?.includes('already exists')) {
+        throw e;
+      }
+    }
+  };
+
+  safeMigrate(`ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;`);
+  safeMigrate(`ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0;`);
+  safeMigrate(`ALTER TABLE users ADD COLUMN locked_until TEXT;`);
 
   // Seed Data if empty
   const userCount = db.prepare(`SELECT count(*) as count FROM users`).get();

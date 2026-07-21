@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, BookOpen, Building2, Search, RefreshCw, Plus, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { Users, BookOpen, Building2, Search, RefreshCw, Plus, CheckCircle, AlertCircle, X, Edit } from 'lucide-react';
 
 export default function DirectoryPage({ currentUser }) {
   const [data, setData] = useState({ students: [], courses: [], departments: [], lecturers: [] });
@@ -10,6 +10,9 @@ export default function DirectoryPage({ currentUser }) {
   // Modals state
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [showCourseModal, setShowCourseModal] = useState(false);
+  const [editStudent, setEditStudent] = useState(null);
+  const [editCourse, setEditCourse] = useState(null);
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -86,6 +89,27 @@ export default function DirectoryPage({ currentUser }) {
     }
   };
 
+  const handleUpdateStudent = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    try {
+      const res = await fetch(`/api/results/directory/students/${editStudent.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(editStudent)
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      setSuccess(resData.message);
+      setEditStudent(null);
+      fetchDirectory();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const handleCreateCourse = async (e) => {
     e.preventDefault();
     setError('');
@@ -102,6 +126,27 @@ export default function DirectoryPage({ currentUser }) {
       setSuccess(resData.message);
       setShowCourseModal(false);
       setCourseForm({ code: '', title: '', department_id: courseForm.department_id, lecturer_id: '' });
+      fetchDirectory();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleUpdateCourse = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    try {
+      const res = await fetch(`/api/results/directory/courses/${editCourse.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(editCourse)
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      setSuccess(resData.message);
+      setEditCourse(null);
       fetchDirectory();
     } catch (err) {
       setError(err.message);
@@ -196,12 +241,13 @@ export default function DirectoryPage({ currentUser }) {
                 <th>Department</th>
                 <th>Parent Email</th>
                 <th>Parent Phone</th>
+                {isStaffManager && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', padding: '24px' }} className="caption">
+                  <td colSpan={isStaffManager ? 6 : 5} style={{ textAlign: 'center', padding: '24px' }} className="caption">
                     Loading registry data...
                   </td>
                 </tr>
@@ -213,6 +259,13 @@ export default function DirectoryPage({ currentUser }) {
                     <td>{s.department_name}</td>
                     <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>{s.parent_email}</td>
                     <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>{s.parent_phone}</td>
+                    {isStaffManager && (
+                      <td>
+                        <button className="btn btn-sm btn-secondary" onClick={() => setEditStudent(s)}>
+                          <Edit size={12} /> Edit
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -231,12 +284,13 @@ export default function DirectoryPage({ currentUser }) {
                 <th>Course Title</th>
                 <th>Department</th>
                 <th>Assigned Lecturer</th>
+                {isStaffManager && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="4" style={{ textAlign: 'center', padding: '24px' }} className="caption">
+                  <td colSpan={isStaffManager ? 5 : 4} style={{ textAlign: 'center', padding: '24px' }} className="caption">
                     Loading course directory...
                   </td>
                 </tr>
@@ -247,6 +301,13 @@ export default function DirectoryPage({ currentUser }) {
                     <td style={{ fontWeight: 500 }}>{c.title}</td>
                     <td>{c.department_name}</td>
                     <td>{c.lecturer_name || 'Unassigned'}</td>
+                    {isStaffManager && (
+                      <td>
+                        <button className="btn btn-sm btn-secondary" onClick={() => setEditCourse(c)}>
+                          <Edit size={12} /> Edit
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -297,6 +358,36 @@ export default function DirectoryPage({ currentUser }) {
         </div>
       )}
 
+      {/* Edit Student Modal */}
+      {editStudent && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="card" style={{ width: '450px', position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 className="h2">Edit Student: {editStudent.student_code}</h2>
+              <button className="btn btn-secondary btn-sm" onClick={() => setEditStudent(null)}><X size={14} /></button>
+            </div>
+            <form onSubmit={handleUpdateStudent} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label className="caption">Full Name</label>
+                <input type="text" className="form-control" required value={editStudent.full_name} onChange={e => setEditStudent({ ...editStudent, full_name: e.target.value })} />
+              </div>
+              <div>
+                <label className="caption">Parent Email</label>
+                <input type="email" className="form-control" value={editStudent.parent_email || ''} onChange={e => setEditStudent({ ...editStudent, parent_email: e.target.value })} />
+              </div>
+              <div>
+                <label className="caption">Parent Phone</label>
+                <input type="tel" className="form-control" value={editStudent.parent_phone || ''} onChange={e => setEditStudent({ ...editStudent, parent_phone: e.target.value })} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setEditStudent(null)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Update Student</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Create Course Modal */}
       {showCourseModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
@@ -334,6 +425,37 @@ export default function DirectoryPage({ currentUser }) {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCourseModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Create Course</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Course Modal */}
+      {editCourse && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="card" style={{ width: '450px', position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 className="h2">Edit Course: {editCourse.code}</h2>
+              <button className="btn btn-secondary btn-sm" onClick={() => setEditCourse(null)}><X size={14} /></button>
+            </div>
+            <form onSubmit={handleUpdateCourse} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label className="caption">Course Title</label>
+                <input type="text" className="form-control" required value={editCourse.title} onChange={e => setEditCourse({ ...editCourse, title: e.target.value })} />
+              </div>
+              <div>
+                <label className="caption">Assigned Lecturer</label>
+                <select className="form-control" value={editCourse.lecturer_id || ''} onChange={e => setEditCourse({ ...editCourse, lecturer_id: e.target.value })}>
+                  <option value="">Unassigned</option>
+                  {data.lecturers?.map(l => (
+                    <option key={l.id} value={l.id}>{l.full_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setEditCourse(null)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Update Course</button>
               </div>
             </form>
           </div>

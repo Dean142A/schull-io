@@ -203,6 +203,7 @@ router.post('/redeem', tokenRateLimiter, (req, res) => {
   res.cookie('schull_session_token', sessionToken, {
     httpOnly: true,
     sameSite: 'strict',
+    secure: process.env.NODE_ENV === 'production',
     maxAge: 20 * 60 * 1000, // 20 minutes
   });
 
@@ -302,6 +303,12 @@ router.post('/appeal', (req, res) => {
   const result = db.prepare(`SELECT * FROM results WHERE id = ?`).get(session.result_id);
   if (!result || result.status !== 'Published') {
     return res.status(403).json({ error: 'Access Revoked: Result is no longer Published.' });
+  }
+
+  // Duplicate Appeal Guard
+  const existingPending = db.prepare(`SELECT id FROM result_appeals WHERE result_id = ? AND status = 'Pending'`).get(result.id);
+  if (existingPending) {
+    return res.status(409).json({ error: 'Conflict: A result verification appeal is already pending review for this record.' });
   }
 
   const appealId = 'app-' + crypto.randomUUID();

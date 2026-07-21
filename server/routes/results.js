@@ -565,4 +565,95 @@ router.post('/:id/unpublish', authorize('UNPUBLISH_RESULTS'), (req, res) => {
   res.json({ message: 'Result unpublished successfully and reverted to Locked state.', status: 'Locked', version: newVersion });
 });
 
+// GET /api/results/appeals - Staff view submitted result verification appeals
+router.get('/appeals', authorize('MODIFY_RESULTS'), (req, res) => {
+  let query = `
+    SELECT a.*, r.score, r.grade, r.status as result_status,
+           s.student_code, s.full_name as student_name,
+           c.code as course_code, c.title as course_title, c.department_id
+    FROM result_appeals a
+    JOIN results r ON a.result_id = r.id
+    JOIN students s ON r.student_id = s.id
+    JOIN courses c ON r.course_id = c.id
+  `;
+  const params = [];
+
+  if (req.user.role === 'Department Officer') {
+    query += ` WHERE c.department_id = ?`;
+    params.push(req.user.department_id);
+  }
+
+  query += ` ORDER BY a.created_at DESC`;
+
+  const appeals = db.prepare(query).all(...params);
+  res.json(appeals);
+});
+
+// POST /api/results/appeals/:id/status - Staff review & update appeal status
+router.post('/appeals/:id/status', authorize('MODIFY_RESULTS'), (req, res) => {
+  const { status, note } = req.body;
+  const appealId = req.params.id;
+
+  if (!['Reviewed', 'Resolved', 'Rejected'].includes(status)) {
+    return res.status(400).json({ error: 'Status must be Reviewed, Resolved, or Rejected.' });
+  }
+
+  const appeal = db.prepare(`SELECT * FROM result_appeals WHERE id = ?`).get(appealId);
+  if (!appeal) {
+    return res.status(404).json({ error: 'Appeal not found' });
+  }
+
+  db.prepare(`UPDATE result_appeals SET status = ? WHERE id = ?`).run(status, appealId);
+
+  recordAuditLog(req, 'APPEAL_STATUS_UPDATE', { appeal_id: appealId, result_id: appeal.result_id, new_status: status, note });
+
+  res.json({ message: `Appeal status updated to ${status}` });
+});
+
+// PUT /api/results/directory/students/:id - Edit Student Info
+router.put('/directory/students/:id', authorize('MODIFY_RESULTS'), (req, res) => {
+  const studentId = req.params.id;
+  const { full_name, parent_email, parent_phone } = req.body;
+
+  const existing = db.prepare(`SELECT * FROM students WHERE id = ?`).get(studentId);
+  if (!existing) {
+    return res.status(404).json({ error: 'Student not found' });
+  }
+
+  if (req.user.role === 'Department Officer' && existing.department_id !== req.user.department_id) {
+    return res.status(403).json({ error: 'Forbidden: Student belongs to another department.' });
+  }
+
+  db.prepare(`
+    UPDATE students SET full_name = ?, parent_email = ?, parent_phone = ? WHERE id = ?
+  `).run(full_name.trim(), parent_email?.trim() || null, parent_phone?.trim() || null, studentId);
+
+  recordAuditLog(req, 'STUDENT_UPDATED', { student_id: studentId, full_name: full_name.trim() });
+
+  res.json({ message: 'Student record updated successfully' });
+});
+
+// PUT /api/results/directory/courses/:id - Edit Course Info & Lecturer Assignment
+router.put('/directory/courses/:id', authorize('MODIFY_RESULTS'), (req, res) => {
+  const courseId = req.params.id;
+  const { title, lecturer_id } = req.body;
+
+  const existing = db.prepare(`SELECT * FROM courses WHERE id = ?`).get(courseId);
+  if (!existing) {
+    return res.status(404).json({ error: 'Course not found' });
+  }
+
+  if (req.user.role === 'Department Officer' && existing.department_id !== req.user.department_id) {
+    return res.status(403).json({ error: 'Forbidden: Course belongs to another department.' });
+  }
+
+  db.prepare(`
+    UPDATE courses SET title = ?, lecturer_id = ? WHERE id = ?
+  `).run(title.trim(), lecturer_id || null, courseId);
+
+  recordAuditLog(req, 'COURSE_UPDATED', { course_id: courseId, title: title.trim(), lecturer_id });
+
+  res.json({ message: 'Course record updated successfully' });
+});
+
 export default router;

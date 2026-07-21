@@ -303,7 +303,7 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       expect(loginRes.status).toBe(200);
     });
 
-    it('registers a new student and course via staff directory endpoints', async () => {
+    it('registers and updates student and course records via staff directory endpoints', async () => {
       // Register student
       const stdRes = await request(app)
         .post('/api/results/directory/students')
@@ -316,6 +316,19 @@ describe('schull.io Security & System Correctness Test Suite', () => {
         });
 
       expect(stdRes.status).toBe(201);
+      const newStdId = stdRes.body.id;
+
+      // Update student
+      const updateStdRes = await request(app)
+        .put(`/api/results/directory/students/${newStdId}`)
+        .set('Cookie', csOfficerCookie)
+        .send({
+          full_name: 'Updated Student Name',
+          parent_email: 'updated.parent@example.com',
+          parent_phone: '+15559998888'
+        });
+
+      expect(updateStdRes.status).toBe(200);
 
       // Create course
       const crsRes = await request(app)
@@ -328,9 +341,21 @@ describe('schull.io Security & System Correctness Test Suite', () => {
         });
 
       expect(crsRes.status).toBe(201);
+      const newCrsId = crsRes.body.id;
+
+      // Update course
+      const updateCrsRes = await request(app)
+        .put(`/api/results/directory/courses/${newCrsId}`)
+        .set('Cookie', csOfficerCookie)
+        .send({
+          title: 'Updated Capstone Title',
+          lecturer_id: 'usr-lecturer-cs1'
+        });
+
+      expect(updateCrsRes.status).toBe(200);
     });
 
-    it('submits a parent result appeal from an active viewer session', async () => {
+    it('submits result appeal, blocks duplicate pending appeal, and allows staff to review and resolve appeal', async () => {
       // Generate & redeem token for Published result res-101
       const genRes = await request(app)
         .post('/api/tokens/generate')
@@ -351,6 +376,16 @@ describe('schull.io Security & System Correctness Test Suite', () => {
 
       expect(appealRes.status).toBe(201);
       expect(appealRes.body.message).toMatch(/submitted successfully/i);
+      const appealId = appealRes.body.appeal_id;
+
+      // Duplicate appeal attempt (rejected with 409)
+      const dupRes = await request(app)
+        .post('/api/tokens/appeal')
+        .set('Cookie', cookie)
+        .send({ reason: 'Duplicate appeal submission attempt' });
+
+      expect(dupRes.status).toBe(409);
+      expect(dupRes.body.error).toMatch(/Conflict/i);
 
       // Verify active appeal attached on view-result
       const viewRes = await request(app)
@@ -359,6 +394,14 @@ describe('schull.io Security & System Correctness Test Suite', () => {
 
       expect(viewRes.body.result.active_appeal).toBeDefined();
       expect(viewRes.body.result.active_appeal.status).toBe('Pending');
+
+      // Staff transition appeal status to Resolved
+      const resolveRes = await request(app)
+        .post(`/api/results/appeals/${appealId}/status`)
+        .set('Cookie', csOfficerCookie)
+        .send({ status: 'Resolved', note: 'Score verified against original script' });
+
+      expect(resolveRes.status).toBe(200);
     });
   });
 });

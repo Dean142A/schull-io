@@ -62,7 +62,19 @@ router.get('/', (req, res) => {
 
 // GET /api/audit-logs/export - Export audit logs to CSV
 router.get('/export', (req, res) => {
-  const logs = db.prepare(`SELECT * FROM audit_logs ORDER BY timestamp DESC`).all();
+  const { role, department_id, id: actorId } = req.user;
+
+  let query = `SELECT * FROM audit_logs`;
+  const params = [];
+
+  if (role === 'Department Officer') {
+    query += ` WHERE (department_id = ? OR actor_id = ?)`;
+    params.push(department_id, actorId);
+  }
+
+  query += ` ORDER BY timestamp DESC`;
+
+  const logs = db.prepare(query).all(...params);
   
   let csv = 'Timestamp,Actor Name,Actor Role,Action Event,IP Address,Details\n';
   logs.forEach(l => {

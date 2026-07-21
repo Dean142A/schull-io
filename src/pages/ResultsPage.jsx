@@ -30,6 +30,39 @@ export default function ResultsPage({ currentUser }) {
   const [bulkCsvText, setBulkCsvText] = useState('');
   const [bulkReport, setBulkReport] = useState(null);
 
+  // Appeals State
+  const [appeals, setAppeals] = useState([]);
+  const [activeTab, setActiveTab] = useState('results'); // 'results' | 'appeals'
+
+  const fetchAppeals = async () => {
+    try {
+      const res = await fetch('/api/results/appeals', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setAppeals(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUpdateAppealStatus = async (appealId, newStatus) => {
+    try {
+      const res = await fetch(`/api/results/appeals/${appealId}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSuccess(`Appeal status updated to ${newStatus}`);
+      fetchAppeals();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const [singleUploadOpen, setSingleUploadOpen] = useState(false);
   const [newResultForm, setNewResultForm] = useState({
     student_id: 'std-001',
@@ -53,6 +86,9 @@ export default function ResultsPage({ currentUser }) {
       }
       const data = await res.json();
       setResults(data);
+      if (currentUser.role === 'Administrator' || currentUser.role === 'Department Officer') {
+        fetchAppeals();
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -324,15 +360,34 @@ export default function ResultsPage({ currentUser }) {
       )}
 
       {/* Search & Filter Controls */}
-      <div className="card" style={{ padding: '14px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <input
-          type="text"
-          className="form-control"
-          placeholder="Search by student name, code, or course..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ width: '280px' }}
-        />
+      <div className="card" style={{ padding: '14px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Search by student name, code, or course..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: '280px' }}
+          />
+
+          {(currentUser.role === 'Administrator' || currentUser.role === 'Department Officer') && (
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                className={`btn btn-sm ${activeTab === 'results' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setActiveTab('results')}
+              >
+                Results Directory
+              </button>
+              <button
+                className={`btn btn-sm ${activeTab === 'appeals' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setActiveTab('appeals')}
+              >
+                Verification Appeals ({appeals.filter(a => a.status === 'Pending').length} Pending)
+              </button>
+            </div>
+          )}
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span className="caption">Status:</span>
@@ -349,7 +404,8 @@ export default function ResultsPage({ currentUser }) {
       </div>
 
       {/* Results Data Table */}
-      <div className="table-container">
+      {activeTab === 'results' && (
+        <div className="table-container">
         <table>
           <thead>
             <tr>
@@ -470,6 +526,80 @@ export default function ResultsPage({ currentUser }) {
           </tbody>
         </table>
       </div>
+      )}
+
+      {/* Appeals Table */}
+      {activeTab === 'appeals' && (
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Student Code & Name</th>
+                <th>Course</th>
+                <th>Score & Grade</th>
+                <th>Appeal Reason</th>
+                <th>Submitted Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {appeals.length === 0 ? (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '24px' }} className="caption">
+                    No result verification appeals submitted yet.
+                  </td>
+                </tr>
+              ) : (
+                appeals.map(appeal => (
+                  <tr key={appeal.id}>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{appeal.student_name}</div>
+                      <div className="caption">{appeal.student_code}</div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{appeal.course_code}</div>
+                      <div className="caption">{appeal.course_title}</div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 700 }}>{appeal.score.toFixed(1)} ({appeal.grade})</div>
+                    </td>
+                    <td style={{ maxWidth: '250px', fontSize: '13px' }}>
+                      {appeal.reason}
+                    </td>
+                    <td className="caption">
+                      {new Date(appeal.created_at).toLocaleString()}
+                    </td>
+                    <td>
+                      <span className={`badge ${appeal.status === 'Pending' ? 'badge-warning' : (appeal.status === 'Resolved' ? 'badge-published' : 'badge-draft')}`}>
+                        {appeal.status}
+                      </span>
+                    </td>
+                    <td>
+                      {appeal.status === 'Pending' && (
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={() => handleUpdateAppealStatus(appeal.id, 'Resolved')}
+                          >
+                            Resolve
+                          </button>
+                          <button
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => handleUpdateAppealStatus(appeal.id, 'Rejected')}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Edit / Override Modal */}
       {editModalResult && (
