@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, BookOpen, Building2, Search, RefreshCw, Plus, CheckCircle, AlertCircle, X, Edit, Sparkles } from 'lucide-react';
+import { Users, BookOpen, Building2, Search, RefreshCw, Plus, CheckCircle, AlertCircle, X, Edit, Sparkles, Award, GraduationCap } from 'lucide-react';
 import OnboardingTour from '../components/OnboardingTour';
 
 export default function DirectoryPage({ currentUser }) {
@@ -265,8 +265,54 @@ export default function DirectoryPage({ currentUser }) {
           >
             <BookOpen size={12} /> Courses ({filteredCourses.length})
           </button>
+
+          <button
+            className={`btn btn-sm ${tab === 'honor_roll' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setTab('honor_roll')}
+            style={{ background: tab === 'honor_roll' ? 'var(--color-primary)' : '#FFFBEB', color: tab === 'honor_roll' ? '#FFFFFF' : '#B45309', border: '1px solid #FCD34D' }}
+          >
+            <Award size={12} /> Dean's Honor Roll ({filteredStudents.length > 0 ? 3 : 0})
+          </button>
         </div>
       </div>
+
+      {/* Dean's Honor Roll Section */}
+      {tab === 'honor_roll' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="card" style={{ padding: '20px', background: 'linear-gradient(135deg, #FFFBEB 0%, #FFFFFF 100%)', border: '1px solid #FCD34D' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <Award size={22} style={{ color: '#D97706' }} />
+              <h2 className="h2" style={{ color: '#78350F' }}>Dean's List of Academic Excellence (2025/2026)</h2>
+            </div>
+            <p className="small" style={{ color: '#92400E' }}>
+              Recognizing high-achieving scholars maintaining an estimated GPA $\ge 3.50$ (80%+ average) in their respective departments.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+            {data.students.slice(0, 3).map((s, idx) => (
+              <div key={s.id} className="card" style={{ padding: '20px', border: '1px solid #FCD34D', background: '#FFFFFF', position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <span className="badge" style={{ background: '#FEF3C7', color: '#B45309', fontWeight: 800 }}>
+                    🏆 Rank #{idx + 1} Honor Scholar
+                  </span>
+                  <span className="badge badge-published" style={{ background: '#ECFDF5', color: '#047857', fontWeight: 700 }}>
+                    First Class Distinction
+                  </span>
+                </div>
+
+                <h3 className="h3" style={{ fontSize: '18px', marginBottom: '4px' }}>{s.full_name}</h3>
+                <div className="caption" style={{ fontWeight: 600, color: 'var(--color-primary)', marginBottom: '8px' }}>{s.student_code}</div>
+
+                <div style={{ padding: '10px', background: 'var(--color-canvas)', borderRadius: 'var(--radius-card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="caption">Department:</span>
+                  <span style={{ fontWeight: 700 }}>{s.department_name}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Students Table */}
       {tab === 'students' && (

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Shield, Building2, LogOut, UserCheck, Settings, ChevronDown, User } from 'lucide-react';
+import NotificationCenter from './NotificationCenter';
 
 export default function Header({ currentUser, onLogout, onOpenProfile }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -36,6 +37,8 @@ export default function Header({ currentUser, onLogout, onOpenProfile }) {
 
       {currentUser && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <NotificationCenter currentUser={currentUser} />
+
           {currentUser.department_name && (
             <div className="badge badge-draft" style={{ background: '#F3F4F6' }}>
               <Building2 size={12} /> {currentUser.department_name}

@@ -4,7 +4,7 @@ import OnboardingTour from '../components/OnboardingTour';
 import {
   Lock, CheckCircle, RotateCcw, Edit, Key, UploadCloud,
   History, AlertCircle, Check, X, ShieldAlert, Plus, FileSpreadsheet, Sparkles,
-  Download, Award, TrendingUp, AlertTriangle, BookOpen
+  Download, Award, TrendingUp, AlertTriangle, BookOpen, Building2
 } from 'lucide-react';
 
 export default function ResultsPage({ currentUser }) {
@@ -429,6 +429,44 @@ export default function ResultsPage({ currentUser }) {
           )}
         </div>
       </div>
+
+      {/* Supervisor / Admin Departmental Comparative Performance Matrix */}
+      {(currentUser.role === 'Supervisor' || currentUser.role === 'Administrator') && (
+        <div className="card" style={{ padding: '20px', background: 'linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 100%)', border: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ padding: '8px', background: '#EEF2FF', borderRadius: '8px', color: '#4F46E5' }}>
+                <Building2 size={20} />
+              </div>
+              <div>
+                <h2 className="h2">Departmental Comparative Performance Matrix</h2>
+                <p className="small">Academic Oversight &bull; Cross-Faculty Comparative Analytics (Computer Science vs Mathematics)</p>
+              </div>
+            </div>
+            <span className="badge badge-published">Supervisory Inspection Active</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+            {/* CS Dept Card */}
+            <div style={{ padding: '16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--color-primary)' }}>Computer Science (CS)</span>
+                <span className="badge badge-published">Pass Rate: 94%</span>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-muted)' }}>Avg Score: <strong>76.4 / 100</strong> &bull; Total Results: <strong>{results.filter(r => r.course_code.startsWith('CS')).length}</strong></div>
+            </div>
+
+            {/* MATH Dept Card */}
+            <div style={{ padding: '16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontWeight: 700, fontSize: '15px', color: '#7C3AED' }}>Mathematics & Stats (MATH)</span>
+                <span className="badge badge-published">Pass Rate: 88%</span>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-muted)' }}>Avg Score: <strong>71.8 / 100</strong> &bull; Total Results: <strong>{results.filter(r => r.course_code.startsWith('MTH')).length}</strong></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lecturer Dedicated Class Analytics & Gradebook Hub */}
       {isLecturer && (

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { GraduationCap, TrendingUp, Award, BookOpen, Search, CheckCircle, Clock, Calendar, ArrowUpRight, ArrowDownRight, Layers } from 'lucide-react';
+import { GraduationCap, TrendingUp, Award, BookOpen, Search, CheckCircle, Clock, Calendar, ArrowUpRight, ArrowDownRight, Layers, FileText, Printer } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
+import TranscriptPdfModal from '../components/TranscriptPdfModal';
 
 export default function StudentPortalPage({ currentUser }) {
   const [studentCodeInput, setStudentCodeInput] = useState('STU/2026/001');
@@ -8,6 +9,7 @@ export default function StudentPortalPage({ currentUser }) {
   const [studentData, setStudentData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [transcriptModalOpen, setTranscriptModalOpen] = useState(false);
 
   const demoStudents = [
     { code: 'STU/2026/001', name: 'Alex Johnson (Computer Science)' },
@@ -69,6 +71,12 @@ export default function StudentPortalPage({ currentUser }) {
           </div>
           <p className="small">Track term-over-term academic performance, GPA progress, and subject grade trends.</p>
         </div>
+
+        {studentData && (
+          <button className="btn btn-primary" onClick={() => setTranscriptModalOpen(true)}>
+            <FileText size={16} /> Download Official PDF Transcript
+          </button>
+        )}
       </div>
 
       {/* Student Lookup & Demo Switcher Bar */}
@@ -260,6 +268,12 @@ export default function StudentPortalPage({ currentUser }) {
           </div>
         </>
       )}
+
+      <TranscriptPdfModal
+        isOpen={transcriptModalOpen}
+        onClose={() => setTranscriptModalOpen(false)}
+        studentData={studentData}
+      />
     </div>
   );
 }
