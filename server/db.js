@@ -32,6 +32,11 @@ export function generateRawToken() {
   return `SCH-${bytes.slice(0, 4)}-${bytes.slice(4, 8)}-${bytes.slice(8, 12)}`;
 }
 
+export function calculateResultChecksum(studentCode, courseCode, score, session, semester) {
+  const payload = `${studentCode.trim().toUpperCase()}|${courseCode.trim().toUpperCase()}|${parseFloat(score).toFixed(1)}|${session.trim()}|${semester.trim()}`;
+  return crypto.createHash('sha256').update(payload).digest('hex');
+}
+
 export function initDb() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS departments (
@@ -175,6 +180,13 @@ export function initDb() {
       blocked_by TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS result_checksums (
+      result_id TEXT PRIMARY KEY,
+      sha256_hash TEXT NOT NULL,
+      generated_at TEXT NOT NULL,
+      FOREIGN KEY(result_id) REFERENCES results(id)
+    );
+
     -- Indexing for performance as audit volume grows
     CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp);
     CREATE INDEX IF NOT EXISTS idx_audit_ip ON audit_logs(ip_address);
@@ -222,6 +234,7 @@ export function initDb() {
   safeMigrate(`ALTER TABLE users ADD COLUMN email TEXT;`);
   safeMigrate(`ALTER TABLE tokens ADD COLUMN dispatched_at TEXT;`);
   safeMigrate(`ALTER TABLE tokens ADD COLUMN dispatched_to TEXT;`);
+  safeMigrate(`ALTER TABLE results ADD COLUMN remark TEXT;`);
 
   // Seed Data if empty
   const userCount = db.prepare(`SELECT count(*) as count FROM users`).get();

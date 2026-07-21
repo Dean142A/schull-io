@@ -69,7 +69,7 @@ export default function ResultsPage({ currentUser }) {
     {
       targetId: 'tour-appeals-tab',
       title: 'Result Verification Appeals',
-      description: 'Department Officers and Administrators can review and resolve grade verification appeals submitted by parents.'
+      description: 'Supervisors and Administrators can review and resolve grade verification appeals submitted by parents.'
     }
   ];
 
@@ -125,7 +125,7 @@ export default function ResultsPage({ currentUser }) {
       }
       const data = await res.json();
       setResults(data);
-      if (currentUser.role === 'Administrator' || currentUser.role === 'Department Officer') {
+      if (currentUser.role === 'Administrator' || currentUser.role === 'Supervisor') {
         fetchAppeals();
       }
     } catch (err) {

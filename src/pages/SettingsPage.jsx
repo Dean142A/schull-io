@@ -30,6 +30,7 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
     token_dispatch_limit_daily: '5',
     token_dispatch_cooldown_mins: '5',
     auto_invalidate_previous_tokens: 'true',
+    log_retention_days: '90',
     disclaimer_template: 'SECURITY ADVISORY: This verification token is single-use and intended strictly for the parent or legal guardian. Do not forward or disclose raw verification tokens to unauthorized third parties.',
   });
 
@@ -226,6 +227,25 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
       if (!res.ok) throw new Error(data.error);
 
       setSuccess(data.message || 'System security settings saved!');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTriggerPurge = async () => {
+    setError('');
+    setSuccess('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/security/purge-logs', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to execute log purge');
+      setSuccess(data.message || 'Log retention purge completed successfully.');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -579,6 +599,21 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
               </select>
               <span className="caption">Duration before staff must re-authenticate.</span>
             </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label className="label">Audit Log Retention Window</label>
+              <select
+                className="form-control"
+                value={systemSettings.log_retention_days || '90'}
+                onChange={(e) => setSystemSettings(prev => ({ ...prev, log_retention_days: e.target.value }))}
+              >
+                <option value="0">Indefinite (Keep All Logs)</option>
+                <option value="30">30 Days</option>
+                <option value="90">90 Days (Recommended)</option>
+                <option value="365">365 Days (1 Year)</option>
+              </select>
+              <span className="caption">Automatically purge older logs from database during background cleanups.</span>
+            </div>
           </div>
 
           <div style={{ padding: '16px', background: 'var(--color-canvas)', borderRadius: 'var(--radius-card)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -591,9 +626,20 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
             </span>
           </div>
 
-          <button type="submit" className="btn btn-primary" disabled={loading} style={{ alignSelf: 'flex-start' }}>
-            {loading ? 'Saving Security Policies...' : 'Save System Security Policies'}
-          </button>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading ? 'Saving Security Policies...' : 'Save System Security Policies'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleTriggerPurge}
+              disabled={loading}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+            >
+              <RefreshCw size={14} className={loading ? "spin" : ""} /> Run Log Purge Job Now
+            </button>
+          </div>
         </form>
       )}
 

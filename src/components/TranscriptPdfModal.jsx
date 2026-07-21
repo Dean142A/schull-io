@@ -8,6 +8,8 @@ export default function TranscriptPdfModal({ isOpen, onClose, studentData }) {
   const estimatedGpa = (Number(overallAverage) / 100 * 4.0).toFixed(2);
   const transcriptDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
+  const verifyUrl = `${window.location.origin}/?tab=verify-transcript&code=${student.student_code.replace(/\//g, '-')}`;
+
   const handlePrint = () => {
     window.print();
   };
@@ -201,21 +203,16 @@ export default function TranscriptPdfModal({ isOpen, onClose, studentData }) {
           {/* Transcript Sign-Off & Verification Seal */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', paddingTop: '20px', borderTop: '2px solid #1E293B' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '60px',
-                height: '60px',
-                border: '2px dashed var(--color-primary)',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '10px',
-                textAlign: 'center',
-                color: 'var(--color-primary)',
-                fontWeight: 700
-              }}>
-                QR VERIFY
-              </div>
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(verifyUrl)}`}
+                alt="Verification QR Code"
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '4px',
+                  border: '1px solid #E2E8F0'
+                }}
+              />
               <div>
                 <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>VERIFICATION HASH:</div>
                 <div style={{ fontFamily: 'monospace', fontSize: '11px', color: '#0F172A', fontWeight: 600 }}>SCH-TRNS-{student.student_code.replace(/\//g, '')}-2026</div>

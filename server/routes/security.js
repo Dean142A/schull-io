@@ -218,4 +218,87 @@ router.post('/simulate-attack', (req, res) => {
   res.json({ message: `Simulated ${count} malicious token redemption attempts from IP ${targetIp}. Check the Security Dashboard!` });
 });
 
+// GET /api/security/export-student/:id (GDPR Compliance: Compile and export all data related to a single student)
+router.get('/export-student/:id', (req, res) => {
+  const studentId = req.params.id;
+  const normalized = studentId.replace(/-/g, '/');
+
+  const student = db.prepare(`
+    SELECT s.*, d.name as department_name 
+    FROM students s
+    JOIN departments d ON s.department_id = d.id
+    WHERE s.id = ? OR s.student_code = ? OR LOWER(s.student_code) = LOWER(?)
+  `).get(studentId, studentId, normalized);
+
+  if (!student) {
+    return res.status(404).json({ error: 'Student record not found' });
+  }
+
+  // 1. Fetch grades
+  const results = db.prepare(`
+    SELECT r.*, c.code as course_code, c.title as course_title 
+    FROM results r
+    JOIN courses c ON r.course_id = c.id
+    WHERE r.student_id = ?
+  `).all(student.id);
+
+  // 2. Fetch tokens generated
+  const tokens = db.prepare(`
+    SELECT t.* 
+    FROM tokens t
+    JOIN results r ON t.result_id = r.id
+    WHERE r.student_id = ?
+  `).all(student.id);
+
+  // 3. Fetch appeals
+  const appeals = db.prepare(`
+    SELECT a.* 
+    FROM result_appeals a
+    JOIN results r ON a.result_id = r.id
+    WHERE r.student_id = ?
+  `).all(student.id);
+
+  // 4. Fetch audit logs related to this student
+  const audits = db.prepare(`
+    SELECT * FROM audit_logs 
+    WHERE details LIKE ? OR details LIKE ?
+  `).all(`%${student.id}%`, `%${student.student_code}%`);
+
+  recordAuditLog(req, 'STUDENT_DATA_EXPORT', { student_id: student.id, student_code: student.student_code });
+
+  res.json({
+    exported_at: new Date().toISOString(),
+    exporter: req.user.full_name,
+    student,
+    results,
+    tokens,
+    appeals,
+    audits
+  });
+});
+
+// POST /api/security/purge-logs (Configurable log retention & purge job)
+router.post('/purge-logs', (req, res) => {
+  const daysSetting = db.prepare(`SELECT value FROM security_settings WHERE key = 'log_retention_days'`).get();
+  const days = daysSetting ? parseInt(daysSetting.value) : 90; // Default to 90 days
+
+  if (days <= 0) {
+    return res.json({ message: 'Log retention is configured as Indefinite. No audit logs were purged.' });
+  }
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = cutoff.toISOString();
+
+  // Count logs to delete
+  const count = db.prepare(`SELECT COUNT(*) as cnt FROM audit_logs WHERE timestamp < ?`).get(cutoffStr).cnt;
+
+  if (count > 0) {
+    db.prepare(`DELETE FROM audit_logs WHERE timestamp < ?`).run(cutoffStr);
+    recordAuditLog(req, 'AUDIT_LOG_RETENTION_PURGE', { retention_days: days, purged_count: count, cutoff_timestamp: cutoffStr });
+  }
+
+  res.json({ message: `Purge job executed successfully: Deleted ${count} audit logs older than ${days} days.` });
+});
+
 export default router;

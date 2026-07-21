@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
-import db, { hashPassword } from '../db.js';
+import db, { hashPassword, calculateResultChecksum } from '../db.js';
 import { authenticateUser, requireAuth, authorize } from '../middleware/auth.js';
 import { recordAuditLog } from '../middleware/auditLogger.js';
 
@@ -254,7 +254,7 @@ router.get('/:id', (req, res) => {
 
 // POST /api/results - Create/Upload single result (Draft or Uploaded state)
 router.post('/', authorize('MODIFY_RESULTS'), (req, res) => {
-  const { student_id, course_id, session, semester, score, status = 'Uploaded' } = req.body;
+  const { student_id, course_id, session, semester, score, status = 'Uploaded', remark } = req.body;
 
   if (!student_id || !course_id || !session || !semester || score === undefined) {
     return res.status(400).json({ error: 'Missing required parameters' });
@@ -284,9 +284,9 @@ router.post('/', authorize('MODIFY_RESULTS'), (req, res) => {
   try {
     db.transaction(() => {
       db.prepare(`
-        INSERT INTO results (id, student_id, course_id, session, semester, score, grade, status, version)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-      `).run(id, student_id, course_id, session, semester, numScore, grade, status);
+        INSERT INTO results (id, student_id, course_id, session, semester, score, grade, status, remark, version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      `).run(id, student_id, course_id, session, semester, numScore, grade, status, remark || null);
 
       // Record history
       db.prepare(`
@@ -403,10 +403,11 @@ router.post('/bulk-upload', authorize('MODIFY_RESULTS'), upload.single('file'), 
       }
 
       const grade = calculateGrade(score);
+      const remark = row.remark?.trim() || null;
 
       if (existing) {
         // Update
-        db.prepare(`UPDATE results SET score = ?, grade = ?, version = version + 1 WHERE id = ?`).run(score, grade, existing.id);
+        db.prepare(`UPDATE results SET score = ?, grade = ?, remark = ?, version = version + 1 WHERE id = ?`).run(score, grade, remark, existing.id);
         db.prepare(`
           INSERT INTO result_history (id, result_id, actor_id, actor_name, action_type, old_score, new_score, old_status, new_status, reason, timestamp)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -417,9 +418,9 @@ router.post('/bulk-upload', authorize('MODIFY_RESULTS'), upload.single('file'), 
         // Create
         const newId = 'res-' + crypto.randomUUID();
         db.prepare(`
-          INSERT INTO results (id, student_id, course_id, session, semester, score, grade, status, version)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 'Uploaded', 1)
-        `).run(newId, student.id, course.id, session, semester, score, grade);
+          INSERT INTO results (id, student_id, course_id, session, semester, score, grade, status, remark, version)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'Uploaded', ?, 1)
+        `).run(newId, student.id, course.id, session, semester, score, grade, remark);
         
         db.prepare(`
           INSERT INTO result_history (id, result_id, actor_id, actor_name, action_type, old_score, new_score, old_status, new_status, reason, timestamp)
@@ -444,7 +445,7 @@ router.post('/bulk-upload', authorize('MODIFY_RESULTS'), upload.single('file'), 
 
 // PUT /api/results/:id - Update score with Optimistic Concurrency Control & Admin Override support
 router.put('/:id', authorize('MODIFY_RESULTS'), (req, res) => {
-  const { score, version, reason } = req.body;
+  const { score, version, reason, remark } = req.body;
   const resultId = req.params.id;
 
   if (score === undefined || version === undefined) {
@@ -502,9 +503,9 @@ router.put('/:id', authorize('MODIFY_RESULTS'), (req, res) => {
   db.transaction(() => {
     db.prepare(`
       UPDATE results 
-      SET score = ?, grade = ?, version = ?
+      SET score = ?, grade = ?, remark = ?, version = ?
       WHERE id = ? AND version = ?
-    `).run(numScore, grade, newVersion, resultId, existing.version);
+    `).run(numScore, grade, remark !== undefined ? remark : existing.remark, newVersion, resultId, existing.version);
 
     db.prepare(`
       INSERT INTO result_history (id, result_id, actor_id, actor_name, action_type, old_score, new_score, old_status, new_status, reason, timestamp)
@@ -568,9 +569,10 @@ router.post('/:id/publish', authorize('PUBLISH_RESULTS'), (req, res) => {
   const resultId = req.params.id;
 
   const existing = db.prepare(`
-    SELECT r.*, c.department_id as course_dept_id
+    SELECT r.*, c.department_id as course_dept_id, c.code as course_code, s.student_code
     FROM results r
     JOIN courses c ON r.course_id = c.id
+    JOIN students s ON r.student_id = s.id
     WHERE r.id = ?
   `).get(resultId);
 
@@ -593,6 +595,13 @@ router.post('/:id/publish', authorize('PUBLISH_RESULTS'), (req, res) => {
 
   db.transaction(() => {
     db.prepare(`UPDATE results SET status = 'Published', version = ? WHERE id = ?`).run(newVersion, resultId);
+
+    // Generate cryptographic checksum hash
+    const checksum = calculateResultChecksum(existing.student_code, existing.course_code, existing.score, existing.session, existing.semester);
+    db.prepare(`
+      INSERT OR REPLACE INTO result_checksums (result_id, sha256_hash, generated_at)
+      VALUES (?, ?, ?)
+    `).run(resultId, checksum, new Date().toISOString());
 
     db.prepare(`
       INSERT INTO result_history (id, result_id, actor_id, actor_name, action_type, old_score, new_score, old_status, new_status, reason, timestamp)
@@ -807,6 +816,85 @@ router.post('/directory/staff', (req, res) => {
     userId,
     simulatedEmail: dispatchLog
   });
+});
+
+// POST /api/results/moderate - Bulk moderate scores (Supervisor/Admin ONLY)
+router.post('/moderate', authorize('MODIFY_RESULTS'), (req, res) => {
+  const { course_id, moderation_value, session, semester } = req.body;
+
+  if (!course_id || moderation_value === undefined || !session || !semester) {
+    return res.status(400).json({ error: 'Missing parameters: course_id, moderation_value, session, and semester' });
+  }
+
+  const shift = parseFloat(moderation_value);
+  if (isNaN(shift)) {
+    return res.status(400).json({ error: 'moderation_value must be a valid number' });
+  }
+
+  // Course verification
+  const course = db.prepare(`SELECT * FROM courses WHERE id = ?`).get(course_id);
+  if (!course) {
+    return res.status(404).json({ error: 'Course not found' });
+  }
+
+  // Supervisor boundary check
+  if (req.user.role === 'Supervisor' && course.department_id !== req.user.department_id) {
+    return res.status(403).json({ error: 'Forbidden: Course belongs to another department' });
+  }
+
+  // Fetch results to moderate (only Draft / Uploaded states can be bulk moderated)
+  const results = db.prepare(`
+    SELECT * FROM results 
+    WHERE course_id = ? AND session = ? AND semester = ? AND status IN ('Draft', 'Uploaded')
+  `).all(course_id, session, semester);
+
+  if (results.length === 0) {
+    return res.status(404).json({ error: 'No results in Draft or Uploaded state found for this course, session, and semester.' });
+  }
+
+  const now = new Date().toISOString();
+
+  db.transaction(() => {
+    results.forEach(r => {
+      const newScore = Math.min(100, Math.max(0, parseFloat((r.score + shift).toFixed(1))));
+      const newGrade = calculateGrade(newScore);
+
+      // Update results
+      db.prepare(`
+        UPDATE results 
+        SET score = ?, grade = ?, version = version + 1
+        WHERE id = ? AND version = ?
+      `).run(newScore, newGrade, r.id, r.version);
+
+      // Insert history logs
+      db.prepare(`
+        INSERT INTO result_history (id, result_id, actor_id, actor_name, action_type, old_score, new_score, old_status, new_status, reason, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'hist-' + crypto.randomUUID(),
+        r.id,
+        req.user.id,
+        req.user.full_name,
+        'MODERATE_BULK',
+        r.score,
+        newScore,
+        r.status,
+        r.status,
+        `Bulk moderation adjustment: ${shift > 0 ? '+' : ''}${shift} points applied`,
+        now
+      );
+    });
+
+    recordAuditLog(req, 'GRADE_MODERATION', {
+      course_code: course.code,
+      session,
+      semester,
+      moderation_shift: shift,
+      affected_count: results.length
+    });
+  })();
+
+  res.json({ message: `Bulk moderation curving applied successfully to ${results.length} results.` });
 });
 
 export default router;

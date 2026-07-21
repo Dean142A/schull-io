@@ -19,6 +19,14 @@ export default function App() {
   const [profileModalOpen, setProfileModalOpen] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (tabParam === 'verify-transcript') {
+      setActiveTab('portal');
+    }
+  }, []);
+
+  useEffect(() => {
     // 1. Fetch demo users for role switching
     fetch('/api/auth/demo-users')
       .then(res => res.json())

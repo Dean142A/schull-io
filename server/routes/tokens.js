@@ -1,6 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
-import db, { hashValue, generateRawToken } from '../db.js';
+import db, { hashValue, generateRawToken, calculateResultChecksum } from '../db.js';
 import { authenticateUser, requireAuth, authorize } from '../middleware/auth.js';
 import { recordAuditLog } from '../middleware/auditLogger.js';
 import { tokenRateLimiter, recordFailedTokenAttempt } from '../middleware/rateLimiter.js';
@@ -318,6 +318,15 @@ router.get('/view-result', (req, res) => {
     });
   }
 
+  // Verify integrity checksum hash
+  const checksumRow = db.prepare(`SELECT sha256_hash FROM result_checksums WHERE result_id = ?`).get(result.id);
+  const computedHash = calculateResultChecksum(result.student_code, result.course_code, result.score, result.session, result.semester);
+  const isIntact = checksumRow ? checksumRow.sha256_hash === computedHash : true;
+
+  if (!isIntact) {
+    recordAuditLog(req, 'CHECKSUM_TAMPER_DETECTED', { result_id: result.id, student_code: result.student_code, course_code: result.course_code });
+  }
+
   const activeAppeal = db.prepare(`
     SELECT id, reason, status, created_at FROM result_appeals WHERE result_id = ? ORDER BY created_at DESC LIMIT 1
   `).get(result.id);
@@ -336,6 +345,7 @@ router.get('/view-result', (req, res) => {
       grade: result.grade,
       status: result.status,
       active_appeal: activeAppeal || null,
+      tamper_detected: !isIntact,
     },
     session_expires_at: session.expires_at,
   });
@@ -384,6 +394,72 @@ router.post('/appeal', (req, res) => {
     message: 'Result appeal submitted successfully. Your request has been queued for review by department officers.',
     appeal_id: appealId,
     created_at: createdAt
+  });
+});
+
+// GET /api/tokens/verify-transcript/:studentCode (Public transcript authenticity verification check)
+router.get('/verify-transcript/:studentCode', (req, res) => {
+  const { studentCode } = req.params;
+  const normalized = studentCode.trim().replace(/-/g, '/');
+
+  const student = db.prepare(`
+    SELECT s.id, s.student_code, s.full_name, d.name as department_name
+    FROM students s
+    JOIN departments d ON s.department_id = d.id
+    WHERE LOWER(s.student_code) = LOWER(?) OR LOWER(s.student_code) = LOWER(?)
+  `).get(studentCode, normalized);
+
+  if (!student) {
+    return res.status(404).json({ error: `Student record with code '${studentCode}' not found` });
+  }
+
+  // Get published results
+  const results = db.prepare(`
+    SELECT r.*, c.code as course_code, c.title as course_title
+    FROM results r
+    JOIN courses c ON r.course_id = c.id
+    WHERE r.student_id = ? AND r.status = 'Published'
+  `).all(student.id);
+
+  let totalScore = 0;
+  let count = 0;
+  let hasTampered = false;
+
+  const verifiedResults = results.map(r => {
+    const checksumRow = db.prepare(`SELECT sha256_hash FROM result_checksums WHERE result_id = ?`).get(r.id);
+    const computedHash = calculateResultChecksum(student.student_code, r.course_code, r.score, r.session, r.semester);
+    const isIntact = checksumRow ? checksumRow.sha256_hash === computedHash : true;
+
+    if (!isIntact) {
+      hasTampered = true;
+    }
+
+    totalScore += Number(r.score) || 0;
+    count += 1;
+
+    return {
+      course_code: r.course_code,
+      course_title: r.course_title,
+      session: r.session,
+      semester: r.semester,
+      score: r.score,
+      grade: r.grade,
+      remark: r.remark,
+      isIntact
+    };
+  });
+
+  res.json({
+    status: hasTampered ? 'TAMPERED_COMPROMISED' : 'AUTHENTIC',
+    signed_by: 'Office of the Registrar, schull.io',
+    verification_timestamp: new Date().toISOString(),
+    student: {
+      student_code: student.student_code,
+      full_name: student.full_name,
+      department_name: student.department_name
+    },
+    results: verifiedResults,
+    overall_average: count > 0 ? (totalScore / count).toFixed(1) : 0
   });
 });
 

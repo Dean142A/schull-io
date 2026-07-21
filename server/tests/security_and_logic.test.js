@@ -11,6 +11,7 @@ import resultsRoutes from '../routes/results.js';
 import tokensRoutes from '../routes/tokens.js';
 import auditRoutes from '../routes/audit.js';
 import securityRoutes from '../routes/security.js';
+import healthRoutes from '../routes/health.js';
 
 // Setup Test Express App
 const app = express();
@@ -24,6 +25,7 @@ app.use('/api/results', resultsRoutes);
 app.use('/api/tokens', tokensRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/security', securityRoutes);
+app.use('/api/health', healthRoutes);
 
 describe('schull.io Security & System Correctness Test Suite', () => {
   let adminCookie = '';
@@ -542,6 +544,71 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       expect(res.body.student.student_code).toBe('STU/2026/001');
       expect(res.body.terms).toBeDefined();
       expect(res.body.overallAverage).toBeDefined();
+    });
+
+    it('verifies the advanced health diagnostics check route returns UP status', async () => {
+      const res = await request(app).get('/api/health');
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('UP');
+      expect(res.body.diagnostics.database).toBe('CONNECTED');
+    });
+
+    it('allows Supervisors to apply bulk grade moderation curving on draft results', async () => {
+      // Ensure Supervisor is logged in to get a valid cookie
+      const loginRes = await request(app)
+        .post('/api/auth/dev-switch-user')
+        .send({ userId: 'usr-supervisor-simple' });
+      const supervisorCookie = loginRes.headers['set-cookie'];
+
+      // Insert a fresh draft result to moderate
+      db.prepare(`
+        INSERT OR REPLACE INTO results (id, student_id, course_id, session, semester, score, grade, status, version)
+        VALUES ('res-moderate-test', 'std-001', 'crs-cs101', '2026/2027', 'First', 70.0, 'A', 'Draft', 1)
+      `).run();
+
+      // Apply moderation to course crs-cs101 (CS course)
+      const res = await request(app)
+        .post('/api/results/moderate')
+        .set('Cookie', supervisorCookie)
+        .send({
+          course_id: 'crs-cs101',
+          moderation_value: 2.5,
+          session: '2026/2027',
+          semester: 'First'
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/applied successfully/i);
+    });
+
+    it('compiles GDPR student data export bundle for Administrators', async () => {
+      const res = await request(app)
+        .get('/api/security/export-student/STU-2026-001')
+        .set('Cookie', adminCookie);
+
+      expect(res.status).toBe(200);
+      expect(res.body.student.student_code).toBe('STU/2026/001');
+      expect(res.body.results).toBeDefined();
+      expect(res.body.tokens).toBeDefined();
+    });
+
+    it('allows Administrators to run configurable log retention purge job', async () => {
+      const res = await request(app)
+        .post('/api/security/purge-logs')
+        .set('Cookie', adminCookie);
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/Purge job executed successfully/i);
+    });
+
+    it('verifies the public transcript authenticity verification check route', async () => {
+      const res = await request(app)
+        .get('/api/tokens/verify-transcript/STU-2026-001');
+
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBeDefined();
+      expect(res.body.student.student_code).toBe('STU/2026/001');
+      expect(res.body.results).toBeDefined();
     });
   });
 });

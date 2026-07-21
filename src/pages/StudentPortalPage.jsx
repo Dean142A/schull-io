@@ -55,6 +55,33 @@ export default function StudentPortalPage({ currentUser }) {
   const overallAvg = studentData?.overallAverage || 0;
   const totalCourses = studentData?.totalCoursesTaken || 0;
 
+  // Group terms by Session & Calculate Session Average
+  const sessionMap = {};
+  terms.forEach(t => {
+    const sessionKey = t.session;
+    if (!sessionMap[sessionKey]) {
+      sessionMap[sessionKey] = {
+        sessionName: sessionKey,
+        terms: [],
+        totalScore: 0,
+        count: 0
+      };
+    }
+    sessionMap[sessionKey].terms.push(t);
+    t.results.forEach(r => {
+      sessionMap[sessionKey].totalScore += Number(r.score) || 0;
+      sessionMap[sessionKey].count += 1;
+    });
+  });
+
+  const sessions = Object.values(sessionMap).map(s => {
+    s.average = s.count > 0 ? Number((s.totalScore / s.count).toFixed(1)) : 0;
+    const order = { 'First': 1, 'Second': 2, 'Third': 3 };
+    s.terms.sort((a, b) => (order[a.semester] || 99) - (order[b.semester] || 99));
+    return s;
+  });
+  sessions.sort((a, b) => b.sessionName.localeCompare(a.sessionName));
+
   // Calculate estimated GPA (4.0 Scale)
   const estimatedGpa = (Number(overallAvg) / 100 * 4.0).toFixed(2);
 
@@ -199,70 +226,94 @@ export default function StudentPortalPage({ currentUser }) {
           </div>
 
           {/* Multi-Term Progress & Historical Comparison */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid var(--color-border)', paddingBottom: '8px' }}>
               <h2 className="h2" style={{ fontSize: '20px' }}>Term-by-Term Progress & Subject Comparison</h2>
               <span className="caption">Historical Academic Record</span>
             </div>
 
-            {terms.map((term, index) => (
-              <div key={term.termLabel} className="card" style={{ padding: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Calendar size={20} style={{ color: 'var(--color-primary)' }} />
-                    <h3 className="h3" style={{ fontSize: '18px' }}>{term.termLabel}</h3>
+            {sessions.map((sess) => (
+              <div key={sess.sessionName} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Session Header Section */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: 'var(--color-primary-subtle)',
+                  padding: '12px 20px',
+                  borderRadius: 'var(--radius-card)',
+                  borderLeft: '4px solid var(--color-primary)'
+                }}>
+                  <span style={{ fontWeight: 700, fontSize: '16px', color: 'var(--color-primary)' }}>
+                    Academic Session: {sess.sessionName}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="caption" style={{ fontWeight: 600, color: 'var(--color-primary)' }}>Session Average:</span>
+                    <span className="badge badge-published" style={{ fontSize: '14px', padding: '4px 10px', background: 'var(--color-primary)', color: '#white' }}>{sess.average} / 100</span>
                   </div>
+                </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span className="caption" style={{ fontWeight: 600 }}>Term Average:</span>
-                    <div style={{
-                      padding: '4px 12px',
-                      background: 'var(--color-primary-subtle)',
-                      color: 'var(--color-primary)',
-                      fontWeight: 700,
-                      borderRadius: 'var(--radius-pill)',
-                      fontSize: '15px'
-                    }}>
-                      {term.average} / 100
+                {sess.terms.map((term) => (
+                  <div key={term.termLabel} className="card" style={{ padding: '24px', marginLeft: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Calendar size={20} style={{ color: 'var(--color-primary)' }} />
+                        <h3 className="h3" style={{ fontSize: '18px' }}>{term.semester} Term</h3>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span className="caption" style={{ fontWeight: 600 }}>Term Average:</span>
+                        <div style={{
+                          padding: '4px 12px',
+                          background: 'var(--color-surface-hover)',
+                          color: 'var(--color-ink)',
+                          fontWeight: 700,
+                          borderRadius: 'var(--radius-pill)',
+                          fontSize: '15px',
+                          border: '1px solid var(--color-border)'
+                        }}>
+                          {term.average} / 100
+                        </div>
+                      </div>
                     </div>
 
-                    {index === 0 && (
-                      <span className="badge badge-published">Current Term</span>
-                    )}
+                    {/* Course Results Table */}
+                    <div className="table-container">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Course Code</th>
+                            <th>Course Title</th>
+                            <th>Lifecycle Status</th>
+                            <th>Score</th>
+                            <th>Grade</th>
+                            <th>Teacher Remark</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {term.results.map(r => (
+                            <tr key={r.id}>
+                              <td style={{ fontWeight: 700 }}>{r.course_code}</td>
+                              <td>{r.course_title}</td>
+                              <td><StatusBadge status={r.status} /></td>
+                              <td style={{ fontWeight: 700, color: Number(r.score) < 40 ? 'var(--color-error)' : 'var(--color-ink)' }}>
+                                {r.score}
+                              </td>
+                              <td>
+                                <span className={`badge ${r.grade === 'A' ? 'badge-published' : (r.grade === 'F' ? 'badge-draft' : '')}`} style={{ fontWeight: 700 }}>
+                                  {r.grade}
+                                </span>
+                              </td>
+                              <td style={{ fontStyle: 'italic', color: 'var(--color-muted)', fontSize: '13px' }}>
+                                {r.remark || <span style={{ color: '#CBD5E1' }}>No remark added</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
-
-                {/* Course Results Table */}
-                <div className="table-container">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Course Code</th>
-                        <th>Course Title</th>
-                        <th>Lifecycle Status</th>
-                        <th>Score</th>
-                        <th>Grade</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {term.results.map(r => (
-                        <tr key={r.id}>
-                          <td style={{ fontWeight: 700 }}>{r.course_code}</td>
-                          <td>{r.course_title}</td>
-                          <td><StatusBadge status={r.status} /></td>
-                          <td style={{ fontWeight: 700, color: Number(r.score) < 40 ? 'var(--color-error)' : 'var(--color-ink)' }}>
-                            {r.score}
-                          </td>
-                          <td>
-                            <span className={`badge ${r.grade === 'A' ? 'badge-published' : (r.grade === 'F' ? 'badge-draft' : '')}`} style={{ fontWeight: 700 }}>
-                              {r.grade}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                ))}
               </div>
             ))}
           </div>

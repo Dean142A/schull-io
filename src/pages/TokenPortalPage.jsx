@@ -10,6 +10,11 @@ export default function TokenPortalPage() {
   const [loading, setLoading] = useState(false);
   const [expiresAt, setExpiresAt] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState('');
+  
+  // Public Verification State
+  const [verificationData, setVerificationData] = useState(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verificationError, setVerificationError] = useState('');
 
   // Appeal Modal state
   const [showAppealModal, setShowAppealModal] = useState(false);
@@ -20,7 +25,31 @@ export default function TokenPortalPage() {
   // Auto-fetch result if active httpOnly session cookie exists
   useEffect(() => {
     fetchSessionResult();
+
+    const params = new URLSearchParams(window.location.search);
+    const verifyCode = params.get('code');
+    if (verifyCode) {
+      handleVerifyTranscript(verifyCode);
+    }
   }, []);
+
+  const handleVerifyTranscript = async (code) => {
+    setVerifying(true);
+    setVerificationError('');
+    setVerificationData(null);
+    try {
+      // Normalize e.g. STU-2026-001 -> STU/2026/001
+      const cleaned = code.replace(/^TRNS-/, '').replace(/-/g, '/');
+      const res = await fetch(`/api/tokens/verify-transcript/${encodeURIComponent(cleaned)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to verify transcript');
+      setVerificationData(data);
+    } catch (err) {
+      setVerificationError(err.message);
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   // Session timer countdown
   useEffect(() => {
@@ -203,8 +232,120 @@ export default function TokenPortalPage() {
         </div>
       )}
 
+      {verifying && (
+        <div className="card" style={{ padding: '32px', textAlign: 'center', marginBottom: '24px' }}>
+          <RefreshCw className="spin" size={32} style={{ color: 'var(--color-primary)', margin: '0 auto 16px auto' }} />
+          <h3 className="h3">Verifying Academic Transcript...</h3>
+          <p className="small">Checking cryptographic signatures against the security database.</p>
+        </div>
+      )}
+
+      {verificationError && (
+        <div className="alert alert-error" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <AlertCircle size={16} /> <span>{verificationError}</span>
+          <button className="btn btn-secondary btn-sm" onClick={() => setVerificationError('')} style={{ marginLeft: 'auto' }}>
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {verificationData && (
+        <div className="card" style={{ padding: '32px', marginBottom: '24px', borderTop: `4px solid ${verificationData.status === 'TAMPERED_COMPROMISED' ? 'var(--color-error)' : 'var(--color-success)'}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <ShieldCheck size={24} style={{ color: verificationData.status === 'TAMPERED_COMPROMISED' ? 'var(--color-error)' : 'var(--color-success)' }} />
+              <h2 className="h2">Transcript Authenticity Status</h2>
+            </div>
+            <button className="btn btn-secondary btn-sm" onClick={() => setVerificationData(null)}>
+              Clear Verification
+            </button>
+          </div>
+
+          {verificationData.status === 'TAMPERED_COMPROMISED' ? (
+            <div style={{
+              background: '#FEF2F2',
+              border: '1px solid #FCA5A5',
+              borderRadius: '8px',
+              padding: '16px',
+              color: '#991B1B',
+              marginBottom: '20px',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <AlertCircle size={20} />
+              CRITICAL WARNING: Cryptographic checksum validation failed. This transcript has been modified outside authorized channels!
+            </div>
+          ) : (
+            <div style={{
+              background: '#ECFDF5',
+              border: '1px solid #A7F3D0',
+              borderRadius: '8px',
+              padding: '16px',
+              color: '#065F46',
+              marginBottom: '20px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <CheckCircle size={20} />
+              Verified Authentic: This document matches the secure registrar database.
+            </div>
+          )}
+
+          <div style={{ background: 'var(--color-surface-hover)', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase' }}>Student Record</div>
+            <div style={{ fontSize: '18px', fontWeight: 700, marginTop: '4px' }}>{verificationData.student.full_name}</div>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '13px' }}>
+              <span>Matric: <strong>{verificationData.student.student_code}</strong></span>
+              <span>&bull;</span>
+              <span>Department: <strong>{verificationData.student.department_name}</strong></span>
+            </div>
+          </div>
+
+          <h3 className="h3" style={{ fontSize: '15px', marginBottom: '10px' }}>Secure Registrar Records</h3>
+          <div className="table-container" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Course</th>
+                  <th>Session/Term</th>
+                  <th>Score</th>
+                  <th>Grade</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {verificationData.results.map((r, i) => (
+                  <tr key={i}>
+                    <td><strong>{r.course_code}</strong><br/><span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{r.course_title}</span></td>
+                    <td>{r.session}<br/><span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{r.semester} Term</span></td>
+                    <td style={{ fontWeight: 700 }}>{r.score}</td>
+                    <td><span className="badge badge-published">{r.grade}</span></td>
+                    <td>
+                      {r.isIntact ? (
+                        <span className="badge badge-published" style={{ background: '#ECFDF5', color: '#047857' }}>Secure</span>
+                      ) : (
+                        <span className="badge badge-draft" style={{ background: '#FEF2F2', color: '#B91C1C' }}>TAMPERED</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', fontSize: '12px', color: 'var(--color-muted)', borderTop: '1px solid var(--color-border)', paddingTop: '12px' }}>
+            <span>Registrar Signature: <strong>Ogude Dean</strong></span>
+            <span>Verified: <strong>{new Date(verificationData.verification_timestamp).toLocaleString()}</strong></span>
+          </div>
+        </div>
+      )}
+
       {/* Redemption Input Form (If no active session) */}
-      {!result ? (
+      {(!result && !verificationData && !verifying) ? (
         <div className="card" style={{ padding: '32px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
             <KeyRound size={20} style={{ color: 'var(--color-primary)' }} />

@@ -12,6 +12,8 @@ import tokensRoutes from './routes/tokens.js';
 import auditRoutes from './routes/audit.js';
 import securityRoutes from './routes/security.js';
 
+import healthRoutes from './routes/health.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -64,11 +66,7 @@ app.use('/api/results', resultsRoutes);
 app.use('/api/tokens', tokensRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/security', securityRoutes);
-
-// Healthcheck
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', name: 'schull.io', timestamp: new Date().toISOString() });
-});
+app.use('/api/health', healthRoutes);
 
 // Serve static frontend assets in production mode if dist exists
 const distPath = path.join(__dirname, '../dist');
