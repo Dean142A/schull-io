@@ -36,7 +36,7 @@ export default function Sidebar({ activeTab, setActiveTab, currentUser, demoUser
           <Users className="nav-icon" /> Student Registry
         </div>
 
-        {(currentUser?.role === 'Administrator' || currentUser?.role === 'Department Officer') && (
+        {(currentUser?.role === 'Administrator' || currentUser?.role === 'Supervisor') && (
           <div
             className={`nav-item ${activeTab === 'audit' ? 'active' : ''}`}
             onClick={() => setActiveTab('audit')}

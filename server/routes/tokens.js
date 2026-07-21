@@ -33,8 +33,8 @@ router.post('/generate', authenticateUser, requireAuth, authorize('GENERATE_TOKE
     return res.status(404).json({ error: 'Result not found' });
   }
 
-  // Department Officer Scope Check
-  if (req.user.role === 'Department Officer' && result.course_dept_id !== req.user.department_id) {
+  // Supervisor Scope Check
+  if (req.user.role === 'Supervisor' && result.course_dept_id !== req.user.department_id) {
     return res.status(403).json({ error: 'Forbidden: Result belongs to another department' });
   }
 

@@ -96,26 +96,26 @@ describe('schull.io Security & System Correctness Test Suite', () => {
     it('allows dev role switcher route in development mode', async () => {
       const res = await request(app)
         .post('/api/auth/dev-switch-user')
-        .send({ userId: 'usr-officer-cs' });
+        .send({ userId: 'usr-supervisor-simple' });
 
       expect(res.status).toBe(200);
-      expect(res.body.user.role).toBe('Department Officer');
+      expect(res.body.user.role).toBe('Supervisor');
       csOfficerCookie = res.headers['set-cookie'];
     });
 
-    it('authenticates CS Teacher / Lecturer', async () => {
+    it('authenticates CS Teacher', async () => {
       const res = await request(app)
         .post('/api/auth/dev-switch-user')
-        .send({ userId: 'usr-lecturer-cs1' });
+        .send({ userId: 'usr-teacher-simple' });
 
       expect(res.status).toBe(200);
-      expect(['Teacher', 'Lecturer']).toContain(res.body.user.role);
+      expect(res.body.user.role).toBe('Teacher');
       csLecturerCookie = res.headers['set-cookie'];
     });
 
     it('immediately revokes authentication when a user account is deactivated (is_active = 0)', async () => {
-      // Deactivate lecturer account in DB
-      db.prepare(`UPDATE users SET is_active = 0 WHERE id = 'usr-lecturer-cs1'`).run();
+      // Deactivate teacher account in DB
+      db.prepare(`UPDATE users SET is_active = 0 WHERE id = 'usr-teacher-simple'`).run();
 
       const res = await request(app)
         .get('/api/results')
@@ -124,12 +124,12 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       expect(res.status).toBe(401);
 
       // Reactivate account for subsequent tests
-      db.prepare(`UPDATE users SET is_active = 1 WHERE id = 'usr-lecturer-cs1'`).run();
+      db.prepare(`UPDATE users SET is_active = 1 WHERE id = 'usr-teacher-simple'`).run();
     });
   });
 
   describe('2. RBAC & Departmental Scope Enforcement', () => {
-    it('restricts Department Officer from viewing results outside their department', async () => {
+    it('restricts Supervisor from viewing results outside their department', async () => {
       const res = await request(app)
         .get('/api/results/res-105') // Math department result
         .set('Cookie', csOfficerCookie);
@@ -138,7 +138,7 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       expect(res.body.error).toMatch(/Forbidden/i);
     });
 
-    it('allows Department Officer to view results inside their department', async () => {
+    it('allows Supervisor to view results inside their department', async () => {
       const res = await request(app)
         .get('/api/results/res-101') // CS department result
         .set('Cookie', csOfficerCookie);
@@ -250,14 +250,14 @@ describe('schull.io Security & System Correctness Test Suite', () => {
     });
   });
 
-  describe('6. Audit Log Immutability & Department Officer Scope', () => {
+  describe('6. Audit Log Immutability & Supervisor Scope', () => {
     it('rejects updates to audit_logs table via SQL triggers', () => {
       expect(() => {
         db.prepare(`UPDATE audit_logs SET details = 'tampered' WHERE id = 'aud-001'`).run();
       }).toThrow(/append-only/i);
     });
 
-    it('makes Admin actions on CS department results visible to CS Department Officer in audit logs', async () => {
+    it('makes Admin actions on CS department results visible to CS Supervisor in audit logs', async () => {
       await request(app)
         .post('/api/results/res-103/lock')
         .set('Cookie', adminCookie);
@@ -279,13 +279,13 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       for (let i = 0; i < 5; i++) {
         await request(app)
           .post('/api/auth/login')
-          .send({ username: 'cs_lecturer1', password: 'wrongpassword' });
+          .send({ username: 'teacher', password: 'wrongpassword' });
       }
 
       // 6th attempt should return 429 Account Locked
       const lockedRes = await request(app)
         .post('/api/auth/login')
-        .send({ username: 'cs_lecturer1', password: 'wrongpassword' });
+        .send({ username: 'teacher', password: 'wrongpassword' });
 
       expect(lockedRes.status).toBe(429);
       expect(lockedRes.body.error).toMatch(/Account.*locked/i);
@@ -294,14 +294,14 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       const unlockRes = await request(app)
         .post('/api/security/unlock-user')
         .set('Cookie', adminCookie)
-        .send({ user_id: 'usr-lecturer-cs1' });
+        .send({ user_id: 'usr-teacher-simple' });
 
       expect(unlockRes.status).toBe(200);
 
       // Verify user can now log in cleanly
       const loginRes = await request(app)
         .post('/api/auth/login')
-        .send({ username: 'cs_lecturer1', password: 'password123' });
+        .send({ username: 'teacher', password: 'password123' });
 
       expect(loginRes.status).toBe(200);
     });
@@ -352,7 +352,7 @@ describe('schull.io Security & System Correctness Test Suite', () => {
         .set('Cookie', csOfficerCookie)
         .send({
           title: 'Updated Capstone Title',
-          lecturer_id: 'usr-lecturer-cs1'
+          lecturer_id: 'usr-teacher-simple'
         });
 
       expect(updateCrsRes.status).toBe(200);
@@ -408,7 +408,7 @@ describe('schull.io Security & System Correctness Test Suite', () => {
     });
 
     it('sets up 2FA TOTP, requires 2FA code during login, and dispatches parent email token', async () => {
-      // 1. Setup 2FA for cs_lecturer1
+      // 1. Setup 2FA for teacher
       const setupRes = await request(app)
         .post('/api/auth/2fa/setup')
         .set('Cookie', csLecturerCookie);
@@ -432,14 +432,14 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       // Attempt login without 2FA code (returns requires_2fa: true)
       const login1 = await request(app)
         .post('/api/auth/login')
-        .send({ username: 'cs_lecturer1', password: 'password123' });
+        .send({ username: 'teacher', password: 'password123' });
 
       expect(login1.body.requires_2fa).toBe(true);
 
       // Attempt login with invalid 2FA code (increments failed attempt counter)
       const invalid2fa = await request(app)
         .post('/api/auth/login')
-        .send({ username: 'cs_lecturer1', password: 'password123', totp_code: '000000' });
+        .send({ username: 'teacher', password: 'password123', totp_code: '000000' });
 
       expect(invalid2fa.status).toBe(401);
       expect(invalid2fa.body.error).toMatch(/Invalid 2FA authentication code/i);
@@ -456,7 +456,7 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       // Attempt login with valid 2FA code (succeeds with set-cookie)
       const login2 = await request(app)
         .post('/api/auth/login')
-        .send({ username: 'cs_lecturer1', password: 'password123', totp_code: validCode });
+        .send({ username: 'teacher', password: 'password123', totp_code: validCode });
 
       expect(login2.status).toBe(200);
       expect(login2.headers['set-cookie']).toBeDefined();

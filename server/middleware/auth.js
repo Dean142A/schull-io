@@ -10,13 +10,13 @@ export const JWT_SECRET = process.env.JWT_SECRET || (
 
 // Permissions Matrix per Section 2.2
 export const PERMISSIONS = {
-  GENERATE_TOKENS: ['Administrator', 'Department Officer'],
-  UPLOAD_RESULTS: ['Lecturer'],
-  MODIFY_RESULTS: ['Administrator', 'Lecturer', 'Department Officer'],
-  LOCK_RESULTS: ['Administrator', 'Department Officer'],
-  PUBLISH_RESULTS: ['Administrator', 'Department Officer'],
+  GENERATE_TOKENS: ['Administrator', 'Supervisor'],
+  UPLOAD_RESULTS: ['Teacher'],
+  MODIFY_RESULTS: ['Administrator', 'Teacher', 'Supervisor'],
+  LOCK_RESULTS: ['Administrator', 'Supervisor'],
+  PUBLISH_RESULTS: ['Administrator', 'Supervisor'],
   UNPUBLISH_RESULTS: ['Administrator'],
-  VIEW_AUDIT_LOGS: ['Administrator', 'Department Officer'],
+  VIEW_AUDIT_LOGS: ['Administrator', 'Supervisor'],
   VIEW_SECURITY_DASHBOARD: ['Administrator'],
 };
 
@@ -92,13 +92,13 @@ export function authorize(permission, getResourceScope = null) {
     if (getResourceScope) {
       const scope = getResourceScope(req); // { department_id, lecturer_id, course_id }
 
-      if (role === 'Department Officer') {
+      if (role === 'Supervisor') {
         if (scope.department_id && scope.department_id !== req.user.department_id) {
           return res.status(403).json({ error: 'Forbidden: Access restricted to your assigned department.' });
         }
       }
 
-      if (role === 'Lecturer') {
+      if (role === 'Teacher') {
         if (scope.lecturer_id && scope.lecturer_id !== req.user.id) {
           return res.status(403).json({ error: 'Forbidden: Access restricted to your assigned courses.' });
         }

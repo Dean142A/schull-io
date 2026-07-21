@@ -262,7 +262,7 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
         >
           <ShieldCheck size={15} /> 2FA & Emergency Recovery
         </button>
-        {(currentUser?.role === 'Administrator' || currentUser?.role === 'Department Officer') && (
+        {(currentUser?.role === 'Administrator' || currentUser?.role === 'Supervisor') && (
           <>
             <button
               className={`btn ${activeTab === 'policies' ? 'btn-primary' : 'btn-secondary'}`}

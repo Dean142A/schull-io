@@ -61,6 +61,19 @@ export default function DirectoryPage({ currentUser }) {
     lecturer_id: ''
   });
 
+  // New Staff Form
+  const [showStaffModal, setShowStaffModal] = useState(false);
+  const [staffForm, setStaffForm] = useState({
+    full_name: '',
+    username: '',
+    email: '',
+    role: 'Teacher',
+    department_id: '',
+    assigned_courses: [],
+    new_course_code: '',
+    new_course_title: ''
+  });
+
   const fetchDirectory = async () => {
     setLoading(true);
     try {
@@ -69,12 +82,14 @@ export default function DirectoryPage({ currentUser }) {
       });
       const d = await res.json();
       setData(d);
-      if (currentUser?.role === 'Department Officer' && currentUser?.department_id) {
+      if ((currentUser?.role === 'Department Officer' || currentUser?.role === 'Supervisor') && currentUser?.department_id) {
         setStudentForm(prev => ({ ...prev, department_id: currentUser.department_id }));
         setCourseForm(prev => ({ ...prev, department_id: currentUser.department_id }));
+        setStaffForm(prev => ({ ...prev, department_id: currentUser.department_id }));
       } else if (d.departments?.length > 0) {
         setStudentForm(prev => ({ ...prev, department_id: d.departments[0].id }));
         setCourseForm(prev => ({ ...prev, department_id: d.departments[0].id }));
+        setStaffForm(prev => ({ ...prev, department_id: d.departments[0].id }));
       }
     } catch (err) {
       console.error(err);
@@ -93,7 +108,54 @@ export default function DirectoryPage({ currentUser }) {
     return <div className="caption" style={{ padding: '24px' }}>Loading session profile...</div>;
   }
 
-  const isStaffManager = currentUser.role === 'Administrator' || currentUser.role === 'Department Officer';
+  const isStaffManager = currentUser.role === 'Administrator' || currentUser.role === 'Supervisor';
+
+  const handleRegisterStaff = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    try {
+      const payload = {
+        full_name: staffForm.full_name,
+        username: staffForm.username,
+        email: staffForm.email,
+        role: staffForm.role,
+        department_id: staffForm.department_id,
+        assigned_courses: staffForm.assigned_courses,
+      };
+
+      if (staffForm.new_course_code && staffForm.new_course_title) {
+        payload.new_course = {
+          code: staffForm.new_course_code,
+          title: staffForm.new_course_title
+        };
+      }
+
+      const res = await fetch('/api/results/directory/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      setSuccess(resData.message);
+      setShowStaffModal(false);
+      setStaffForm({
+        full_name: '',
+        username: '',
+        email: '',
+        role: 'Teacher',
+        department_id: data.departments?.[0]?.id || '',
+        assigned_courses: [],
+        new_course_code: '',
+        new_course_title: ''
+      });
+      fetchDirectory();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   const handleRegisterStudent = async (e) => {
     e.preventDefault();
@@ -214,6 +276,11 @@ export default function DirectoryPage({ currentUser }) {
           </button>
           {isStaffManager && (
             <>
+              {currentUser.role === 'Administrator' && (
+                <button className="btn btn-primary" onClick={() => setShowStaffModal(true)} style={{ background: '#047857' }}>
+                  <Plus size={14} /> Register Staff
+                </button>
+              )}
               <button className="btn btn-primary" onClick={() => setShowStudentModal(true)}>
                 <Plus size={14} /> Register Student
               </button>
@@ -273,6 +340,15 @@ export default function DirectoryPage({ currentUser }) {
           >
             <Award size={12} /> Dean's Honor Roll ({filteredStudents.length > 0 ? 3 : 0})
           </button>
+
+          {(currentUser.role === 'Administrator' || currentUser.role === 'Supervisor') && (
+            <button
+              className={`btn btn-sm ${tab === 'staff' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setTab('staff')}
+            >
+              <Users size={12} /> Staff Registry ({data.lecturers?.length || 0})
+            </button>
+          )}
         </div>
       </div>
 
@@ -367,7 +443,7 @@ export default function DirectoryPage({ currentUser }) {
                 <th>Course Code</th>
                 <th>Course Title</th>
                 <th>Department</th>
-                <th>Assigned Lecturer</th>
+                <th>Assigned Teacher</th>
                 {isStaffManager && <th>Actions</th>}
               </tr>
             </thead>
@@ -400,6 +476,160 @@ export default function DirectoryPage({ currentUser }) {
         </div>
       )}
 
+      {/* Staff Table */}
+      {tab === 'staff' && (
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Full Name</th>
+                <th>Username</th>
+                <th>Email Address</th>
+                <th>Role</th>
+                <th>Assigned Department</th>
+                <th>Assigned Subjects</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '24px' }} className="caption">
+                    Loading staff registry...
+                  </td>
+                </tr>
+              ) : (
+                data.lecturers?.map(l => {
+                  const teacherCourses = data.courses?.filter(c => c.lecturer_id === l.id) || [];
+                  return (
+                    <tr key={l.id}>
+                      <td style={{ fontWeight: 600 }}>{l.full_name}</td>
+                      <td style={{ fontFamily: 'monospace' }}>{l.username}</td>
+                      <td style={{ fontFamily: 'monospace' }}>{l.email}</td>
+                      <td>
+                        <span className={`badge ${l.role === 'Supervisor' ? 'badge-locked' : 'badge-published'}`}>
+                          {l.role}
+                        </span>
+                      </td>
+                      <td>{l.department_name || 'N/A'}</td>
+                      <td>
+                        {teacherCourses.length > 0 ? (
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                            {teacherCourses.map(c => (
+                              <span key={c.id} className="badge badge-draft" style={{ fontSize: '11px' }}>
+                                {c.code}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--color-muted)', fontSize: '12px' }}>None</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Register Staff Modal */}
+      {showStaffModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="card" style={{ width: '520px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 className="h2">Register New Staff Member</h2>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowStaffModal(false)}><X size={14} /></button>
+            </div>
+            <form onSubmit={handleRegisterStaff} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label className="caption">Full Name</label>
+                <input type="text" className="form-control" required value={staffForm.full_name} onChange={e => setStaffForm({ ...staffForm, full_name: e.target.value })} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="caption">Username</label>
+                  <input type="text" className="form-control" required value={staffForm.username} onChange={e => setStaffForm({ ...staffForm, username: e.target.value })} />
+                </div>
+                <div>
+                  <label className="caption">Email Address</label>
+                  <input type="email" className="form-control" required value={staffForm.email} onChange={e => setStaffForm({ ...staffForm, email: e.target.value })} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="caption">Role</label>
+                  <select className="form-control" value={staffForm.role} onChange={e => setStaffForm({ ...staffForm, role: e.target.value })}>
+                    <option value="Teacher">Teacher (can upload/modify grades)</option>
+                    <option value="Supervisor">Supervisor (can inspect/lock/publish)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="caption">Assigned Department</label>
+                  <select className="form-control" value={staffForm.department_id} onChange={e => setStaffForm({ ...staffForm, department_id: e.target.value })}>
+                    {data.departments?.map(d => (
+                      <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {staffForm.role === 'Teacher' && (
+                <>
+                  <div>
+                    <label className="caption" style={{ fontWeight: 600 }}>Assign Existing Subjects/Classes</label>
+                    <div style={{ maxHeight: '120px', overflowY: 'auto', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '8px', background: 'var(--color-canvas)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {data.courses?.filter(c => c.department_id === staffForm.department_id).length === 0 ? (
+                        <span className="caption" style={{ color: 'var(--color-muted)' }}>No courses found for this department.</span>
+                      ) : (
+                        data.courses?.filter(c => c.department_id === staffForm.department_id).map(c => (
+                          <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                            <input
+                              type="checkbox"
+                              checked={staffForm.assigned_courses.includes(c.id)}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setStaffForm(prev => {
+                                  const list = checked
+                                    ? [...prev.assigned_courses, c.id]
+                                    : prev.assigned_courses.filter(id => id !== c.id);
+                                  return { ...prev, assigned_courses: list };
+                                });
+                              }}
+                            />
+                            <strong>{c.code}</strong> - {c.title}
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px dashed var(--color-border)', paddingTop: '10px' }}>
+                    <label className="caption" style={{ fontWeight: 600, color: 'var(--color-primary)' }}>Or Create & Assign a New Subject/Course</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px', marginTop: '6px' }}>
+                      <div>
+                        <input type="text" className="form-control" placeholder="Code (e.g. CS410)" value={staffForm.new_course_code} onChange={e => setStaffForm({ ...staffForm, new_course_code: e.target.value })} style={{ fontSize: '12px' }} />
+                      </div>
+                      <div>
+                        <input type="text" className="form-control" placeholder="Title (e.g. Machine Learning)" value={staffForm.new_course_title} onChange={e => setStaffForm({ ...staffForm, new_course_title: e.target.value })} style={{ fontSize: '12px' }} />
+                      </div>
+                    </div>
+                    <span className="caption" style={{ color: 'var(--color-muted)', fontSize: '11px', display: 'block', marginTop: '4px' }}>
+                      Leave code and title blank if not creating a new subject.
+                    </span>
+                  </div>
+                </>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowStaffModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Register Staff</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Register Student Modal */}
       {showStudentModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
@@ -419,7 +649,7 @@ export default function DirectoryPage({ currentUser }) {
               </div>
               <div>
                 <label className="caption">Department</label>
-                <select className="form-control" disabled={currentUser.role === 'Department Officer'} value={studentForm.department_id} onChange={e => setStudentForm({ ...studentForm, department_id: e.target.value })}>
+                <select className="form-control" disabled={currentUser.role === 'Supervisor'} value={studentForm.department_id} onChange={e => setStudentForm({ ...studentForm, department_id: e.target.value })}>
                   {data.departments?.map(d => (
                     <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
                   ))}
@@ -491,14 +721,14 @@ export default function DirectoryPage({ currentUser }) {
               </div>
               <div>
                 <label className="caption">Department</label>
-                <select className="form-control" disabled={currentUser.role === 'Department Officer'} value={courseForm.department_id} onChange={e => setCourseForm({ ...courseForm, department_id: e.target.value })}>
+                <select className="form-control" disabled={currentUser.role === 'Supervisor'} value={courseForm.department_id} onChange={e => setCourseForm({ ...courseForm, department_id: e.target.value })}>
                   {data.departments?.map(d => (
                     <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="caption">Assigned Lecturer (Optional)</label>
+                <label className="caption">Assigned Teacher (Optional)</label>
                 <select className="form-control" value={courseForm.lecturer_id} onChange={e => setCourseForm({ ...courseForm, lecturer_id: e.target.value })}>
                   <option value="">Unassigned</option>
                   {data.lecturers?.map(l => (
@@ -529,7 +759,7 @@ export default function DirectoryPage({ currentUser }) {
                 <input type="text" className="form-control" required value={editCourse.title} onChange={e => setEditCourse({ ...editCourse, title: e.target.value })} />
               </div>
               <div>
-                <label className="caption">Assigned Lecturer</label>
+                <label className="caption">Assigned Teacher</label>
                 <select className="form-control" value={editCourse.lecturer_id || ''} onChange={e => setEditCourse({ ...editCourse, lecturer_id: e.target.value })}>
                   <option value="">Unassigned</option>
                   {data.lecturers?.map(l => (

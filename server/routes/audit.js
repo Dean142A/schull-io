@@ -19,7 +19,7 @@ router.get('/', (req, res) => {
   const params = [];
 
   // Scope: Dept Officer can only view logs related to their own department or members
-  if (role === 'Department Officer') {
+  if (role === 'Supervisor') {
     conditions.push(`(department_id = ? OR actor_id = ?)`);
     params.push(department_id, req.user.id);
   }
@@ -67,7 +67,7 @@ router.get('/export', (req, res) => {
   let query = `SELECT * FROM audit_logs`;
   const params = [];
 
-  if (role === 'Department Officer') {
+  if (role === 'Supervisor') {
     query += ` WHERE (department_id = ? OR actor_id = ?)`;
     params.push(department_id, actorId);
   }

@@ -51,9 +51,9 @@ export default function App() {
       const data = await res.json();
       if (data.user) {
         setCurrentUser(data.user);
-        if (user.role === 'Lecturer' && (activeTab === 'audit' || activeTab === 'security')) {
+        if (user.role === 'Teacher' && (activeTab === 'audit' || activeTab === 'security')) {
           setActiveTab('results');
-        } else if (user.role === 'Department Officer' && activeTab === 'security') {
+        } else if (user.role === 'Supervisor' && activeTab === 'security') {
           setActiveTab('results');
         }
       }

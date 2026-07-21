@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
-import db from '../db.js';
+import db, { hashPassword } from '../db.js';
 import { authenticateUser, requireAuth, authorize } from '../middleware/auth.js';
 import { recordAuditLog } from '../middleware/auditLogger.js';
 
@@ -108,12 +108,18 @@ router.get('/directory', (req, res) => {
   `).all();
 
   const departments = db.prepare(`SELECT * FROM departments ORDER BY name ASC`).all();
-  const lecturers = db.prepare(`SELECT id, full_name, department_id FROM users WHERE role = 'Lecturer' ORDER BY full_name ASC`).all();
+  const lecturers = db.prepare(`
+    SELECT u.id, u.username, u.email, u.full_name, u.role, u.department_id, d.name as department_name
+    FROM users u
+    LEFT JOIN departments d ON u.department_id = d.id
+    WHERE u.role IN ('Teacher', 'Supervisor')
+    ORDER BY u.full_name ASC
+  `).all();
 
   res.json({ students, courses, departments, lecturers });
 });
 
-// POST /api/results/directory/students - Register New Student (Admin or Department Officer own dept)
+// POST /api/results/directory/students - Register New Student (Admin or Supervisor own dept)
 router.post('/directory/students', authorize('MODIFY_RESULTS'), (req, res) => {
   const { student_code, full_name, department_id, parent_email, parent_phone } = req.body;
 
@@ -121,8 +127,8 @@ router.post('/directory/students', authorize('MODIFY_RESULTS'), (req, res) => {
     return res.status(400).json({ error: 'student_code, full_name, and department_id are required' });
   }
 
-  // Department Officer Scope Check
-  if (req.user.role === 'Department Officer' && department_id !== req.user.department_id) {
+  // Supervisor Scope Check
+  if (req.user.role === 'Supervisor' && department_id !== req.user.department_id) {
     return res.status(403).json({ error: 'Forbidden: You can only register students for your assigned department.' });
   }
 
@@ -145,7 +151,7 @@ router.post('/directory/students', authorize('MODIFY_RESULTS'), (req, res) => {
   }
 });
 
-// POST /api/results/directory/courses - Create New Course (Admin or Department Officer own dept)
+// POST /api/results/directory/courses - Create New Course (Admin or Supervisor own dept)
 router.post('/directory/courses', authorize('MODIFY_RESULTS'), (req, res) => {
   const { code, title, department_id, lecturer_id } = req.body;
 
@@ -153,7 +159,7 @@ router.post('/directory/courses', authorize('MODIFY_RESULTS'), (req, res) => {
     return res.status(400).json({ error: 'code, title, and department_id are required' });
   }
 
-  if (req.user.role === 'Department Officer' && department_id !== req.user.department_id) {
+  if (req.user.role === 'Supervisor' && department_id !== req.user.department_id) {
     return res.status(403).json({ error: 'Forbidden: You can only create courses in your assigned department.' });
   }
 
@@ -195,10 +201,10 @@ router.get('/', (req, res) => {
   const params = [];
   const conditions = [];
 
-  if (role === 'Department Officer') {
+  if (role === 'Supervisor') {
     conditions.push(`c.department_id = ?`);
     params.push(department_id);
-  } else if (role === 'Lecturer') {
+  } else if (role === 'Teacher') {
     conditions.push(`c.lecturer_id = ?`);
     params.push(userId);
   }
@@ -232,10 +238,10 @@ router.get('/:id', (req, res) => {
   }
 
   // Scope check
-  if (req.user.role === 'Department Officer' && result.course_dept_id !== req.user.department_id) {
+  if (req.user.role === 'Supervisor' && result.course_dept_id !== req.user.department_id) {
     return res.status(403).json({ error: 'Forbidden: Result belongs to another department' });
   }
-  if (req.user.role === 'Lecturer' && result.lecturer_id !== req.user.id) {
+  if (req.user.role === 'Teacher' && result.lecturer_id !== req.user.id) {
     return res.status(403).json({ error: 'Forbidden: Result belongs to another course' });
   }
 
@@ -260,10 +266,10 @@ router.post('/', authorize('MODIFY_RESULTS'), (req, res) => {
   }
 
   // Scope verification
-  if (req.user.role === 'Lecturer' && course.lecturer_id !== req.user.id) {
+  if (req.user.role === 'Teacher' && course.lecturer_id !== req.user.id) {
     return res.status(403).json({ error: 'Forbidden: You are not assigned to this course.' });
   }
-  if (req.user.role === 'Department Officer' && course.department_id !== req.user.department_id) {
+  if (req.user.role === 'Supervisor' && course.department_id !== req.user.department_id) {
     return res.status(403).json({ error: 'Forbidden: Course is outside your department.' });
   }
 
@@ -378,11 +384,11 @@ router.post('/bulk-upload', authorize('MODIFY_RESULTS'), upload.single('file'), 
       }
 
       // Scope Check
-      if (req.user.role === 'Department Officer' && course.department_id !== req.user.department_id) {
+      if (req.user.role === 'Supervisor' && course.department_id !== req.user.department_id) {
         errorReports.push({ row: row.rowIndex, error: `Course '${course_code}' belongs to a different department` });
         continue;
       }
-      if (req.user.role === 'Lecturer' && course.lecturer_id !== req.user.id) {
+      if (req.user.role === 'Teacher' && course.lecturer_id !== req.user.id) {
         errorReports.push({ row: row.rowIndex, error: `You are not assigned to course '${course_code}'` });
         continue;
       }
@@ -465,16 +471,16 @@ router.put('/:id', authorize('MODIFY_RESULTS'), (req, res) => {
   }
 
   // 2. Scope & Status Rules
-  if (req.user.role === 'Lecturer') {
+  if (req.user.role === 'Teacher') {
     if (existing.lecturer_id !== req.user.id) {
       return res.status(403).json({ error: 'Forbidden: You are not assigned to this course.' });
     }
     if (existing.status === 'Locked' || existing.status === 'Published') {
-      return res.status(403).json({ error: 'Forbidden: Lecturers cannot modify results after they are Locked or Published.' });
+      return res.status(403).json({ error: 'Forbidden: Teachers cannot modify results after they are Locked or Published.' });
     }
   }
 
-  if (req.user.role === 'Department Officer') {
+  if (req.user.role === 'Supervisor') {
     if (existing.course_dept_id !== req.user.department_id) {
       return res.status(403).json({ error: 'Forbidden: Course belongs to another department.' });
     }
@@ -533,7 +539,7 @@ router.post('/:id/lock', authorize('LOCK_RESULTS'), (req, res) => {
     return res.status(404).json({ error: 'Result not found' });
   }
 
-  if (req.user.role === 'Department Officer' && existing.course_dept_id !== req.user.department_id) {
+  if (req.user.role === 'Supervisor' && existing.course_dept_id !== req.user.department_id) {
     return res.status(403).json({ error: 'Forbidden: Result belongs to another department.' });
   }
 
@@ -572,7 +578,7 @@ router.post('/:id/publish', authorize('PUBLISH_RESULTS'), (req, res) => {
     return res.status(404).json({ error: 'Result not found' });
   }
 
-  if (req.user.role === 'Department Officer' && existing.course_dept_id !== req.user.department_id) {
+  if (req.user.role === 'Supervisor' && existing.course_dept_id !== req.user.department_id) {
     return res.status(403).json({ error: 'Forbidden: Result belongs to another department.' });
   }
 
@@ -646,7 +652,7 @@ router.get('/appeals', authorize('MODIFY_RESULTS'), (req, res) => {
   `;
   const params = [];
 
-  if (req.user.role === 'Department Officer') {
+  if (req.user.role === 'Supervisor') {
     query += ` WHERE c.department_id = ?`;
     params.push(req.user.department_id);
   }
@@ -688,7 +694,7 @@ router.put('/directory/students/:id', authorize('MODIFY_RESULTS'), (req, res) =>
     return res.status(404).json({ error: 'Student not found' });
   }
 
-  if (req.user.role === 'Department Officer' && existing.department_id !== req.user.department_id) {
+  if (req.user.role === 'Supervisor' && existing.department_id !== req.user.department_id) {
     return res.status(403).json({ error: 'Forbidden: Student belongs to another department.' });
   }
 
@@ -701,7 +707,7 @@ router.put('/directory/students/:id', authorize('MODIFY_RESULTS'), (req, res) =>
   res.json({ message: 'Student record updated successfully' });
 });
 
-// PUT /api/results/directory/courses/:id - Edit Course Info & Lecturer Assignment
+// PUT /api/results/directory/courses/:id - Edit Course Info & Teacher Assignment
 router.put('/directory/courses/:id', authorize('MODIFY_RESULTS'), (req, res) => {
   const courseId = req.params.id;
   const { title, lecturer_id } = req.body;
@@ -711,7 +717,7 @@ router.put('/directory/courses/:id', authorize('MODIFY_RESULTS'), (req, res) => 
     return res.status(404).json({ error: 'Course not found' });
   }
 
-  if (req.user.role === 'Department Officer' && existing.department_id !== req.user.department_id) {
+  if (req.user.role === 'Supervisor' && existing.department_id !== req.user.department_id) {
     return res.status(403).json({ error: 'Forbidden: Course belongs to another department.' });
   }
 
@@ -722,6 +728,85 @@ router.put('/directory/courses/:id', authorize('MODIFY_RESULTS'), (req, res) => 
   recordAuditLog(req, 'COURSE_UPDATED', { course_id: courseId, title: title.trim(), lecturer_id });
 
   res.json({ message: 'Course record updated successfully' });
+});
+
+// POST /api/results/directory/staff - Register New Staff Member (Admin only)
+router.post('/directory/staff', (req, res) => {
+  if (req.user.role !== 'Administrator') {
+    return res.status(403).json({ error: 'Forbidden: Only Administrators can register staff members.' });
+  }
+
+  const { full_name, username, email, role, department_id, assigned_courses, new_course } = req.body;
+
+  if (!full_name || !username || !email || !role || !department_id) {
+    return res.status(400).json({ error: 'full_name, username, email, role, and department_id are required' });
+  }
+
+  if (!['Teacher', 'Supervisor'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role. Must be Teacher or Supervisor.' });
+  }
+
+  const existing = db.prepare(`SELECT id FROM users WHERE username = ? OR email = ?`).get(username.trim().toLowerCase(), email.trim().toLowerCase());
+  if (existing) {
+    return res.status(409).json({ error: 'A staff member with this username or email already exists.' });
+  }
+
+  const userId = 'usr-' + crypto.randomUUID();
+  const defaultPassword = 'password123';
+  const passwordHash = hashPassword(defaultPassword);
+
+  db.transaction(() => {
+    // 1. Insert user
+    db.prepare(`
+      INSERT INTO users (id, username, email, password_hash, full_name, role, department_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(userId, username.trim().toLowerCase(), email.trim().toLowerCase(), passwordHash, full_name.trim(), role, department_id);
+
+    // 2. If new course details are provided, create the new course on the fly!
+    if (new_course && new_course.code && new_course.title) {
+      const courseId = 'crs-' + crypto.randomUUID();
+      db.prepare(`
+        INSERT INTO courses (id, code, title, department_id, lecturer_id)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(courseId, new_course.code.trim().toUpperCase(), new_course.title.trim(), department_id, userId);
+
+      recordAuditLog(req, 'COURSE_CREATED', { course_id: courseId, code: new_course.code.trim().toUpperCase(), title: new_course.title.trim() });
+    }
+
+    // 3. Assign existing courses
+    if (Array.isArray(assigned_courses) && assigned_courses.length > 0) {
+      for (const courseId of assigned_courses) {
+        db.prepare(`UPDATE courses SET lecturer_id = ? WHERE id = ?`).run(userId, courseId);
+      }
+    }
+  })();
+
+  // Simulated Email Dispatch details
+  const portalLink = `${req.protocol}://${req.get('host')}/`;
+  const dispatchLog = `
+    --------------------------------------------------
+    SIMULATED EMAIL DISPATCH TO: ${email.trim()}
+    SUBJECT: Welcome to schull.io - Staff Portal Access Details
+    BODY:
+    Hello ${full_name.trim()},
+    Your profile has been created successfully as a ${role}.
+    Your portal access credentials:
+    - Portal Link: ${portalLink}
+    - Username: ${username.trim().toLowerCase()}
+    - Password: ${defaultPassword}
+    Please setup your 2FA TOTP code upon first log in.
+    --------------------------------------------------
+  `;
+  console.log(dispatchLog);
+
+  recordAuditLog(req, 'STAFF_REGISTERED', { user_id: userId, username: username.trim().toLowerCase(), role, email: email.trim().toLowerCase() });
+  recordAuditLog(req, 'EMAIL_DISPATCHED_NEW_USER', { user_id: userId, email: email.trim().toLowerCase() });
+
+  res.status(201).json({
+    message: `Staff registered successfully. Onboarding email sent to ${email.trim()}.`,
+    userId,
+    simulatedEmail: dispatchLog
+  });
 });
 
 export default router;

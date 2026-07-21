@@ -353,8 +353,8 @@ export default function ResultsPage({ currentUser }) {
     }
   };
 
-  // Lecturer Gradebook & Class Analytics Calculations
-  const isLecturer = currentUser?.role === 'Lecturer';
+  // Teacher Gradebook & Class Analytics Calculations
+  const isLecturer = currentUser?.role === 'Teacher';
 
   const scoresList = results.map(r => Number(r.score) || 0);
   const totalStudents = scoresList.length;
@@ -383,7 +383,7 @@ export default function ResultsPage({ currentUser }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Lecturer_Gradebook_Template_${currentUser?.username || 'staff'}.csv`;
+    a.download = `Teacher_Gradebook_Template_${currentUser?.username || 'staff'}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -417,7 +417,7 @@ export default function ResultsPage({ currentUser }) {
           <button className="btn btn-secondary" onClick={() => setTourOpen(true)}>
             Take Guided Tour
           </button>
-          {(currentUser.role === 'Lecturer' || currentUser.role === 'Department Officer' || currentUser.role === 'Administrator') && (
+          {(currentUser.role === 'Teacher' || currentUser.role === 'Supervisor' || currentUser.role === 'Administrator') && (
             <>
               <button className="btn btn-secondary" onClick={() => setSingleUploadOpen(true)}>
                 <Plus size={14} /> Upload Single Score
@@ -468,7 +468,7 @@ export default function ResultsPage({ currentUser }) {
         </div>
       )}
 
-      {/* Lecturer Dedicated Class Analytics & Gradebook Hub */}
+      {/* Teacher Dedicated Class Analytics & Gradebook Hub */}
       {isLecturer && (
         <div className="card" style={{ padding: '20px', background: 'linear-gradient(135deg, #FAF8FF 0%, #FFFFFF 100%)', border: '1px solid var(--color-border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -477,7 +477,7 @@ export default function ResultsPage({ currentUser }) {
                 <BookOpen size={20} />
               </div>
               <div>
-                <h2 className="h2">Lecturer Gradebook & Class Performance Hub</h2>
+                <h2 className="h2">Teacher Gradebook & Class Performance Hub</h2>
                 <p className="small">Teaching Staff Workspace &bull; Assigned Course Analytics & Course CSV Template Exporter</p>
               </div>
             </div>
@@ -555,7 +555,7 @@ export default function ResultsPage({ currentUser }) {
             style={{ width: '280px' }}
           />
 
-          {(currentUser.role === 'Administrator' || currentUser.role === 'Department Officer') && (
+          {(currentUser.role === 'Administrator' || currentUser.role === 'Supervisor') && (
             <div style={{ display: 'flex', gap: '6px' }} id="tour-appeals-tab">
               <button
                 className={`btn btn-sm ${activeTab === 'results' ? 'btn-primary' : 'btn-secondary'}`}
@@ -648,7 +648,7 @@ export default function ResultsPage({ currentUser }) {
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'flex-end' }}>
                       {/* Token Generation */}
-                      {(currentUser.role === 'Administrator' || currentUser.role === 'Department Officer') && (r.status === 'Locked' || r.status === 'Published') && (
+                      {(currentUser.role === 'Administrator' || currentUser.role === 'Supervisor') && (r.status === 'Locked' || r.status === 'Published') && (
                         <button
                           className="btn btn-sm btn-primary"
                           title="Generate Access Token"
@@ -672,14 +672,14 @@ export default function ResultsPage({ currentUser }) {
                       </button>
 
                       {/* Lock (Uploaded -> Locked) */}
-                      {(currentUser.role === 'Administrator' || currentUser.role === 'Department Officer') && r.status === 'Uploaded' && (
+                      {(currentUser.role === 'Administrator' || currentUser.role === 'Supervisor') && r.status === 'Uploaded' && (
                         <button className="btn btn-sm btn-secondary" onClick={() => handleLock(r.id)}>
                           <Lock size={12} style={{ color: 'var(--color-warning)' }} /> Lock
                         </button>
                       )}
 
                       {/* Publish (Locked -> Published ONLY) */}
-                      {(currentUser.role === 'Administrator' || currentUser.role === 'Department Officer') && r.status === 'Locked' && (
+                      {(currentUser.role === 'Administrator' || currentUser.role === 'Supervisor') && r.status === 'Locked' && (
                         <button className="btn btn-sm btn-secondary" onClick={() => handlePublish(r.id)}>
                           <CheckCircle size={12} style={{ color: 'var(--color-success)' }} /> Publish
                         </button>

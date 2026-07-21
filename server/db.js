@@ -45,7 +45,7 @@ export function initDb() {
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       full_name TEXT NOT NULL,
-      role TEXT NOT NULL CHECK(role IN ('Administrator', 'Teacher', 'Supervisor', 'Lecturer', 'Department Officer', 'Student', 'Parent/Student Viewer')),
+      role TEXT NOT NULL CHECK(role IN ('Administrator', 'Teacher', 'Supervisor', 'Student', 'Parent/Student Viewer')),
       department_id TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
       failed_login_attempts INTEGER NOT NULL DEFAULT 0,
@@ -233,20 +233,17 @@ export function initDb() {
   const defaultPasswordHash = hashPassword('password123');
   const demoUsers = [
     { id: 'usr-admin', username: 'admin', email: 'admin@schull.io', name: 'System Administrator (Ogude Dean)', role: 'Administrator', dept: null },
-    { id: 'usr-supervisor-simple', username: 'supervisor', email: 'supervisor@schull.io', name: 'Academic Supervisor (Prof. Alan Turing)', role: 'Supervisor', dept: null },
-    { id: 'usr-officer-cs', username: 'cs_officer', email: 'cs_officer@schull.io', name: 'Dr. Sarah Connor', role: 'Department Officer', dept: 'dept-cs' },
-    { id: 'usr-officer-simple', username: 'officer', email: 'officer@schull.io', name: 'Dr. Sarah Connor', role: 'Department Officer', dept: 'dept-cs' },
-    { id: 'usr-officer-math', username: 'math_officer', email: 'math_officer@schull.io', name: 'Prof. Alan Turing', role: 'Department Officer', dept: 'dept-math' },
+    { id: 'usr-supervisor-simple', username: 'supervisor', email: 'supervisor@schull.io', name: 'Academic Supervisor (Prof. Alan Turing)', role: 'Supervisor', dept: 'dept-cs' },
     { id: 'usr-teacher-simple', username: 'teacher', email: 'teacher@schull.io', name: 'Dr. Grace Hopper', role: 'Teacher', dept: 'dept-cs' },
-    { id: 'usr-lecturer-cs1', username: 'cs_lecturer1', email: 'cs_lecturer1@schull.io', name: 'Dr. Grace Hopper', role: 'Teacher', dept: 'dept-cs' },
-    { id: 'usr-lecturer-simple', username: 'lecturer', email: 'lecturer@schull.io', name: 'Dr. Grace Hopper', role: 'Teacher', dept: 'dept-cs' },
-    { id: 'usr-lecturer-math1', username: 'math_lecturer1', email: 'math_lecturer1@schull.io', name: 'Dr. Katherine Johnson', role: 'Teacher', dept: 'dept-math' },
   ];
+
+  // Clean up legacy users not in this list to strictly wipe them out
+  db.prepare(`DELETE FROM users WHERE username NOT IN ('admin', 'teacher', 'supervisor')`).run();
 
   for (const demo of demoUsers) {
     const existing = db.prepare(`SELECT id FROM users WHERE username = ?`).get(demo.username);
     if (existing) {
-      db.prepare(`UPDATE users SET email = ?, password_hash = ?, failed_login_attempts = 0, locked_until = NULL, is_active = 1 WHERE username = ?`).run(demo.email, defaultPasswordHash, demo.username);
+      db.prepare(`UPDATE users SET email = ?, role = ?, password_hash = ?, failed_login_attempts = 0, locked_until = NULL, is_active = 1 WHERE username = ?`).run(demo.email, demo.role, defaultPasswordHash, demo.username);
     } else {
       db.prepare(`INSERT OR IGNORE INTO users (id, username, email, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(demo.id, demo.username, demo.email, defaultPasswordHash, demo.name, demo.role, demo.dept);
     }
@@ -276,37 +273,25 @@ function seedData() {
     'usr-admin', 'admin', 'admin@schull.io', defaultPassword, 'System Administrator (Ogude Dean)', 'Administrator', null
   );
 
-  // Department Officers
+  // Supervisor
   db.prepare(`INSERT OR IGNORE INTO users (id, username, email, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
-    'usr-officer-cs', 'cs_officer', 'cs_officer@schull.io', defaultPassword, 'Dr. Sarah Connor', 'Department Officer', 'dept-cs'
-  );
-  db.prepare(`INSERT OR IGNORE INTO users (id, username, email, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
-    'usr-officer-simple', 'officer', 'officer@schull.io', defaultPassword, 'Dr. Sarah Connor', 'Department Officer', 'dept-cs'
-  );
-  db.prepare(`INSERT OR IGNORE INTO users (id, username, email, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
-    'usr-officer-math', 'math_officer', 'math_officer@schull.io', defaultPassword, 'Prof. Alan Turing', 'Department Officer', 'dept-math'
+    'usr-supervisor-simple', 'supervisor', 'supervisor@schull.io', defaultPassword, 'Academic Supervisor (Prof. Alan Turing)', 'Supervisor', 'dept-cs'
   );
 
-  // Lecturers
+  // Teacher
   db.prepare(`INSERT OR IGNORE INTO users (id, username, email, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
-    'usr-lecturer-cs1', 'cs_lecturer1', 'cs_lecturer1@schull.io', defaultPassword, 'Dr. Grace Hopper', 'Lecturer', 'dept-cs'
-  );
-  db.prepare(`INSERT OR IGNORE INTO users (id, username, email, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
-    'usr-lecturer-simple', 'lecturer', 'lecturer@schull.io', defaultPassword, 'Dr. Grace Hopper', 'Lecturer', 'dept-cs'
-  );
-  db.prepare(`INSERT OR IGNORE INTO users (id, username, email, password_hash, full_name, role, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
-    'usr-lecturer-math1', 'math_lecturer1', 'math_lecturer1@schull.io', defaultPassword, 'Dr. Katherine Johnson', 'Lecturer', 'dept-math'
+    'usr-teacher-simple', 'teacher', 'teacher@schull.io', defaultPassword, 'Dr. Grace Hopper', 'Teacher', 'dept-cs'
   );
 
   // Courses
   db.prepare(`INSERT INTO courses (id, code, title, department_id, lecturer_id) VALUES (?, ?, ?, ?, ?)`).run(
-    'crs-cs101', 'CS101', 'Introduction to Computer Science', 'dept-cs', 'usr-lecturer-cs1'
+    'crs-cs101', 'CS101', 'Introduction to Computer Science', 'dept-cs', 'usr-teacher-simple'
   );
   db.prepare(`INSERT INTO courses (id, code, title, department_id, lecturer_id) VALUES (?, ?, ?, ?, ?)`).run(
-    'crs-cs302', 'CS302', 'Distributed Systems & Security', 'dept-cs', 'usr-lecturer-cs1'
+    'crs-cs302', 'CS302', 'Distributed Systems & Security', 'dept-cs', 'usr-teacher-simple'
   );
   db.prepare(`INSERT INTO courses (id, code, title, department_id, lecturer_id) VALUES (?, ?, ?, ?, ?)`).run(
-    'crs-mth201', 'MTH201', 'Linear Algebra & Calculus', 'dept-math', 'usr-lecturer-math1'
+    'crs-mth201', 'MTH201', 'Linear Algebra & Calculus', 'dept-math', 'usr-teacher-simple'
   );
 
   // Students
