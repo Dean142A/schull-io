@@ -45,7 +45,7 @@ export function initDb() {
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       full_name TEXT NOT NULL,
-      role TEXT NOT NULL CHECK(role IN ('Administrator', 'Lecturer', 'Department Officer', 'Parent/Student Viewer')),
+      role TEXT NOT NULL CHECK(role IN ('Administrator', 'Teacher', 'Supervisor', 'Lecturer', 'Department Officer', 'Student', 'Parent/Student Viewer')),
       department_id TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
       failed_login_attempts INTEGER NOT NULL DEFAULT 0,
@@ -233,12 +233,14 @@ export function initDb() {
   const defaultPasswordHash = hashPassword('password123');
   const demoUsers = [
     { id: 'usr-admin', username: 'admin', email: 'admin@schull.io', name: 'System Administrator (Ogude Dean)', role: 'Administrator', dept: null },
+    { id: 'usr-supervisor-simple', username: 'supervisor', email: 'supervisor@schull.io', name: 'Academic Supervisor (Prof. Alan Turing)', role: 'Supervisor', dept: null },
     { id: 'usr-officer-cs', username: 'cs_officer', email: 'cs_officer@schull.io', name: 'Dr. Sarah Connor', role: 'Department Officer', dept: 'dept-cs' },
     { id: 'usr-officer-simple', username: 'officer', email: 'officer@schull.io', name: 'Dr. Sarah Connor', role: 'Department Officer', dept: 'dept-cs' },
     { id: 'usr-officer-math', username: 'math_officer', email: 'math_officer@schull.io', name: 'Prof. Alan Turing', role: 'Department Officer', dept: 'dept-math' },
-    { id: 'usr-lecturer-cs1', username: 'cs_lecturer1', email: 'cs_lecturer1@schull.io', name: 'Dr. Grace Hopper', role: 'Lecturer', dept: 'dept-cs' },
-    { id: 'usr-lecturer-simple', username: 'lecturer', email: 'lecturer@schull.io', name: 'Dr. Grace Hopper', role: 'Lecturer', dept: 'dept-cs' },
-    { id: 'usr-lecturer-math1', username: 'math_lecturer1', email: 'math_lecturer1@schull.io', name: 'Dr. Katherine Johnson', role: 'Lecturer', dept: 'dept-math' },
+    { id: 'usr-teacher-simple', username: 'teacher', email: 'teacher@schull.io', name: 'Dr. Grace Hopper', role: 'Teacher', dept: 'dept-cs' },
+    { id: 'usr-lecturer-cs1', username: 'cs_lecturer1', email: 'cs_lecturer1@schull.io', name: 'Dr. Grace Hopper', role: 'Teacher', dept: 'dept-cs' },
+    { id: 'usr-lecturer-simple', username: 'lecturer', email: 'lecturer@schull.io', name: 'Dr. Grace Hopper', role: 'Teacher', dept: 'dept-cs' },
+    { id: 'usr-lecturer-math1', username: 'math_lecturer1', email: 'math_lecturer1@schull.io', name: 'Dr. Katherine Johnson', role: 'Teacher', dept: 'dept-math' },
   ];
 
   for (const demo of demoUsers) {

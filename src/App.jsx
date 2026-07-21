@@ -8,6 +8,7 @@ import SecurityDashboardPage from './pages/SecurityDashboardPage';
 import DirectoryPage from './pages/DirectoryPage';
 import LoginPage from './pages/LoginPage';
 import SettingsPage from './pages/SettingsPage';
+import StudentPortalPage from './pages/StudentPortalPage';
 import ProfileModal from './components/ProfileModal';
 
 export default function App() {
@@ -106,6 +107,7 @@ export default function App() {
           {activeTab === 'results' && <ResultsPage currentUser={currentUser} />}
           {activeTab === 'directory' && <DirectoryPage currentUser={currentUser} />}
           {activeTab === 'portal' && <TokenPortalPage />}
+          {activeTab === 'student-portal' && <StudentPortalPage currentUser={currentUser} />}
           {activeTab === 'audit' && <AuditLogsPage currentUser={currentUser} />}
           {activeTab === 'security' && <SecurityDashboardPage currentUser={currentUser} />}
           {activeTab === 'settings' && <SettingsPage currentUser={currentUser} onUpdateUser={(updatedUser) => setCurrentUser(updatedUser)} />}

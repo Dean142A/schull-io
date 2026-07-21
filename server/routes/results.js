@@ -9,6 +9,74 @@ import { recordAuditLog } from '../middleware/auditLogger.js';
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+// GET /api/results/student/:studentCode/history - Multi-term performance & term comparison for student portal (Public Access)
+router.get('/student/:studentCode/history', (req, res) => {
+  const { studentCode } = req.params;
+  const normalized = studentCode.trim().replace(/-/g, '/');
+
+  const student = db.prepare(`
+    SELECT s.*, d.name as department_name, d.code as department_code
+    FROM students s
+    LEFT JOIN departments d ON s.department_id = d.id
+    WHERE LOWER(s.student_code) = LOWER(?) OR LOWER(s.student_code) = LOWER(?) OR s.id = ?
+  `).get(studentCode, normalized, studentCode);
+
+  if (!student) {
+    return res.status(404).json({ error: `Student record matching code '${studentCode}' was not found.` });
+  }
+
+  const results = db.prepare(`
+    SELECT r.*, c.code as course_code, c.title as course_title
+    FROM results r
+    JOIN courses c ON r.course_id = c.id
+    WHERE r.student_id = ?
+    ORDER BY r.session DESC, r.semester DESC
+  `).all(student.id);
+
+  // Group by Term (Session + Semester)
+  const termMap = {};
+  results.forEach(r => {
+    const termKey = `${r.session} (${r.semester} Semester)`;
+    if (!termMap[termKey]) {
+      termMap[termKey] = {
+        session: r.session,
+        semester: r.semester,
+        termLabel: termKey,
+        results: [],
+        totalScore: 0,
+        count: 0,
+        average: 0
+      };
+    }
+    termMap[termKey].results.push(r);
+    termMap[termKey].totalScore += Number(r.score) || 0;
+    termMap[termKey].count += 1;
+  });
+
+  const terms = Object.values(termMap).map(term => {
+    term.average = term.count > 0 ? Number((term.totalScore / term.count).toFixed(1)) : 0;
+    return term;
+  });
+
+  // Calculate Overall Averages and Growth Trajectory
+  const overallAvg = results.length > 0 ? (results.reduce((a, b) => a + Number(b.score), 0) / results.length).toFixed(1) : 0;
+  
+  let growthTrajectory = 0;
+  if (terms.length >= 2) {
+    const latestAvg = terms[0].average;
+    const previousAvg = terms[1].average;
+    growthTrajectory = Number((latestAvg - previousAvg).toFixed(1));
+  }
+
+  res.json({
+    student,
+    overallAverage: overallAvg,
+    growthTrajectory,
+    terms,
+    totalCoursesTaken: results.length
+  });
+});
+
 router.use(authenticateUser);
 router.use(requireAuth);
 

@@ -103,13 +103,13 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       csOfficerCookie = res.headers['set-cookie'];
     });
 
-    it('authenticates CS Lecturer', async () => {
+    it('authenticates CS Teacher / Lecturer', async () => {
       const res = await request(app)
         .post('/api/auth/dev-switch-user')
         .send({ userId: 'usr-lecturer-cs1' });
 
       expect(res.status).toBe(200);
-      expect(res.body.user.role).toBe('Lecturer');
+      expect(['Teacher', 'Lecturer']).toContain(res.body.user.role);
       csLecturerCookie = res.headers['set-cookie'];
     });
 
@@ -532,6 +532,16 @@ describe('schull.io Security & System Correctness Test Suite', () => {
 
       expect(putRes.status).toBe(200);
       expect(putRes.body.message).toMatch(/Security settings updated/i);
+    });
+
+    it('fetches student multi-term performance history for Student Portal', async () => {
+      const res = await request(app)
+        .get('/api/results/student/STU-2026-001/history');
+
+      expect(res.status).toBe(200);
+      expect(res.body.student.student_code).toBe('STU/2026/001');
+      expect(res.body.terms).toBeDefined();
+      expect(res.body.overallAverage).toBeDefined();
     });
   });
 });
