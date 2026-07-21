@@ -1,8 +1,5 @@
 import db from '../db.js';
 
-// In-memory sliding window store for IP redemption failures
-const ipFailedAttempts = new Map(); // IP -> Array of timestamps (ms)
-
 const WINDOW_MS = 15 * 60 * 1000; // 15 minutes window
 
 export function getSuspiciousThreshold() {
@@ -11,27 +8,46 @@ export function getSuspiciousThreshold() {
 }
 
 export function recordFailedTokenAttempt(ip) {
-  const now = Date.now();
-  const attempts = ipFailedAttempts.get(ip) || [];
-  // Filter out attempts outside the window
-  const validAttempts = attempts.filter(ts => now - ts < WINDOW_MS);
-  validAttempts.push(now);
-  ipFailedAttempts.set(ip, validAttempts);
-  return validAttempts.length;
+  const nowStr = new Date().toISOString();
+  const existing = db.prepare(`SELECT attempt_count, last_attempt FROM ip_rate_limits WHERE ip_address = ?`).get(ip);
+
+  let newCount = 1;
+  if (existing) {
+    const elapsed = Date.now() - new Date(existing.last_attempt).getTime();
+    newCount = elapsed < WINDOW_MS ? existing.attempt_count + 1 : 1;
+  }
+
+  db.prepare(`
+    INSERT OR REPLACE INTO ip_rate_limits (ip_address, attempt_count, last_attempt)
+    VALUES (?, ?, ?)
+  `).run(ip, newCount, nowStr);
+
+  return newCount;
 }
 
 export function tokenRateLimiter(req, res, next) {
-  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-  const threshold = getSuspiciousThreshold();
-  const now = Date.now();
+  const forwarded = req.headers['x-forwarded-for'];
+  const ip = forwarded ? forwarded.split(',')[0].trim() : (req.ip || req.socket?.remoteAddress || '127.0.0.1');
 
-  const attempts = (ipFailedAttempts.get(ip) || []).filter(ts => now - ts < WINDOW_MS);
-  ipFailedAttempts.set(ip, attempts);
-
-  if (attempts.length >= threshold) {
-    return res.status(429).json({
-      error: 'Rate limit exceeded: Too many invalid token attempts from your IP address. Please try again later.'
+  // 1. Check if IP is in manual blocklist
+  const blocked = db.prepare(`SELECT reason FROM ip_blocklist WHERE ip_address = ?`).get(ip);
+  if (blocked) {
+    return res.status(403).json({
+      error: `Access Denied: Your IP address has been blocked by system administrators. Reason: ${blocked.reason}`
     });
+  }
+
+  // 2. Check rate limit
+  const threshold = getSuspiciousThreshold();
+  const record = db.prepare(`SELECT attempt_count, last_attempt FROM ip_rate_limits WHERE ip_address = ?`).get(ip);
+
+  if (record) {
+    const elapsed = Date.now() - new Date(record.last_attempt).getTime();
+    if (elapsed < WINDOW_MS && record.attempt_count >= threshold) {
+      return res.status(429).json({
+        error: 'Rate limit exceeded: Too many invalid token attempts from your IP address. Please try again later.'
+      });
+    }
   }
 
   next();
@@ -39,20 +55,12 @@ export function tokenRateLimiter(req, res, next) {
 
 export function getFailedAttemptsByIp() {
   const threshold = getSuspiciousThreshold();
-  const now = Date.now();
-  const result = [];
+  const rows = db.prepare(`SELECT ip_address, attempt_count, last_attempt FROM ip_rate_limits ORDER BY attempt_count DESC`).all();
 
-  for (const [ip, timestamps] of ipFailedAttempts.entries()) {
-    const valid = timestamps.filter(ts => now - ts < WINDOW_MS);
-    if (valid.length > 0) {
-      result.push({
-        ip_address: ip,
-        failed_count: valid.length,
-        is_suspicious: valid.length >= threshold,
-        last_attempt: new Date(Math.max(...valid)).toISOString(),
-      });
-    }
-  }
-
-  return result.sort((a, b) => b.failed_count - a.failed_count);
+  return rows.map(r => ({
+    ip_address: r.ip_address,
+    failed_count: r.attempt_count,
+    is_suspicious: r.attempt_count >= threshold,
+    last_attempt: r.last_attempt,
+  }));
 }

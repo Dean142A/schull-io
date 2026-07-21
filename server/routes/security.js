@@ -64,6 +64,9 @@ router.get('/dashboard', (req, res) => {
     WHERE (locked_until IS NOT NULL AND locked_until > datetime('now')) OR is_active = 0 OR failed_login_attempts > 0
   `).all();
 
+  // 6. Blocked IPs
+  const blockedIps = db.prepare(`SELECT * FROM ip_blocklist ORDER BY blocked_at DESC`).all();
+
   res.json({
     threshold,
     ip_activity: ipActivity,
@@ -71,8 +74,60 @@ router.get('/dashboard', (req, res) => {
     activity_breakdown: activityBreakdown,
     result_stats: resultStats,
     locked_users: lockedUsers,
+    blocked_ips: blockedIps,
     live_failed_attempts: getFailedAttemptsByIp(),
   });
+});
+
+// POST /api/security/block-ip - Manually block an IP address
+router.post('/block-ip', (req, res) => {
+  const { ip_address, reason } = req.body;
+  if (!ip_address || !reason) {
+    return res.status(400).json({ error: 'ip_address and reason parameters are required.' });
+  }
+
+  const nowStr = new Date().toISOString();
+  db.prepare(`
+    INSERT OR REPLACE INTO ip_blocklist (ip_address, reason, blocked_at, blocked_by)
+    VALUES (?, ?, ?, ?)
+  `).run(ip_address.trim(), reason.trim(), nowStr, req.user.username);
+
+  recordAuditLog(req, 'IP_BLOCKED', { blocked_ip: ip_address.trim(), reason: reason.trim() });
+
+  res.json({ message: `IP address ${ip_address} has been added to the security blocklist.` });
+});
+
+// POST /api/security/unblock-ip - Manually remove IP from blocklist
+router.post('/unblock-ip', (req, res) => {
+  const { ip_address } = req.body;
+  if (!ip_address) {
+    return res.status(400).json({ error: 'ip_address parameter is required.' });
+  }
+
+  db.prepare(`DELETE FROM ip_blocklist WHERE ip_address = ?`).run(ip_address.trim());
+  recordAuditLog(req, 'IP_UNBLOCKED', { unblocked_ip: ip_address.trim() });
+
+  res.json({ message: `IP address ${ip_address} has been unblocked.` });
+});
+
+// GET /api/security/export-incidents - Export Security Incidents to CSV
+router.get('/export-incidents', (req, res) => {
+  const incidents = db.prepare(`
+    SELECT timestamp, ip_address, action, actor_name, actor_role, details
+    FROM audit_logs
+    WHERE action IN ('LOGIN_FAILED', 'LOGIN_BLOCKED_LOCKED', 'TOKEN_INVALID_ATTEMPT', 'TOKEN_REUSE_ATTEMPT', 'TOKEN_EXPIRED_ATTEMPT', 'ACCOUNT_LOCKED', 'IP_BLOCKED')
+    ORDER BY timestamp DESC
+  `).all();
+
+  let csv = 'Timestamp,IP Address,Action Event,Actor Name,Actor Role,Details\n';
+  incidents.forEach(inc => {
+    const detailsClean = (inc.details || '').replace(/"/g, '""');
+    csv += `"${inc.timestamp}","${inc.ip_address}","${inc.action}","${inc.actor_name}","${inc.actor_role}","${detailsClean}"\n`;
+  });
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="schull_security_incidents.csv"');
+  res.send(csv);
 });
 
 // POST /api/security/unlock-user - Admin unlock of locked or disabled user accounts

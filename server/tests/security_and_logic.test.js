@@ -403,5 +403,98 @@ describe('schull.io Security & System Correctness Test Suite', () => {
 
       expect(resolveRes.status).toBe(200);
     });
+
+    it('sets up 2FA TOTP, requires 2FA code during login, and dispatches parent email token', async () => {
+      // 1. Setup 2FA for cs_lecturer1
+      const setupRes = await request(app)
+        .post('/api/auth/2fa/setup')
+        .set('Cookie', csLecturerCookie);
+
+      expect(setupRes.status).toBe(200);
+      expect(setupRes.body.secret).toBeDefined();
+      const secret = setupRes.body.secret;
+
+      // Generate valid TOTP code
+      const { generateTotpCode } = await import('../utils/totp.js');
+      const validCode = generateTotpCode(secret);
+
+      // Enable 2FA
+      const enableRes = await request(app)
+        .post('/api/auth/2fa/enable')
+        .set('Cookie', csLecturerCookie)
+        .send({ totp_code: validCode });
+
+      expect(enableRes.status).toBe(200);
+
+      // Attempt login without 2FA code (returns requires_2fa: true)
+      const login1 = await request(app)
+        .post('/api/auth/login')
+        .send({ username: 'cs_lecturer1', password: 'password123' });
+
+      expect(login1.body.requires_2fa).toBe(true);
+
+      // Attempt login with valid 2FA code (succeeds with set-cookie)
+      const login2 = await request(app)
+        .post('/api/auth/login')
+        .send({ username: 'cs_lecturer1', password: 'password123', totp_code: validCode });
+
+      expect(login2.status).toBe(200);
+      expect(login2.headers['set-cookie']).toBeDefined();
+
+      // Disable 2FA for test cleanup
+      await request(app)
+        .post('/api/auth/2fa/disable')
+        .set('Cookie', csLecturerCookie)
+        .send({ password: 'password123', totp_code: validCode });
+
+      // 2. Token Email Dispatch
+      const genRes = await request(app)
+        .post('/api/tokens/generate')
+        .set('Cookie', adminCookie)
+        .send({ result_id: 'res-101' });
+
+      const dispatchRes = await request(app)
+        .post('/api/tokens/dispatch')
+        .set('Cookie', adminCookie)
+        .send({ token_id: genRes.body.token_id, email: 'parent.test@example.com' });
+
+      expect(dispatchRes.status).toBe(200);
+      expect(dispatchRes.body.dispatched_to).toBe('parent.test@example.com');
+    });
+
+    it('enforces manual IP blocklist and exports security incidents CSV', async () => {
+      // Block IP 198.51.100.99
+      const blockRes = await request(app)
+        .post('/api/security/block-ip')
+        .set('Cookie', adminCookie)
+        .send({ ip_address: '198.51.100.99', reason: 'Automated vulnerability scanner' });
+
+      expect(blockRes.status).toBe(200);
+
+      // Verify blocked IP receives 403 on token redemption
+      const redeemRes = await request(app)
+        .post('/api/tokens/redeem')
+        .set('X-Forwarded-For', '198.51.100.99')
+        .send({ raw_token: 'INVALID-TOKEN' });
+
+      expect(redeemRes.status).toBe(403);
+      expect(redeemRes.body.error).toMatch(/blocked by system administrators/i);
+
+      // Unblock IP
+      const unblockRes = await request(app)
+        .post('/api/security/unblock-ip')
+        .set('Cookie', adminCookie)
+        .send({ ip_address: '198.51.100.99' });
+
+      expect(unblockRes.status).toBe(200);
+
+      // Export incidents CSV
+      const exportRes = await request(app)
+        .get('/api/security/export-incidents')
+        .set('Cookie', adminCookie);
+
+      expect(exportRes.status).toBe(200);
+      expect(exportRes.headers['content-type']).toMatch(/text\/csv/);
+    });
   });
 });

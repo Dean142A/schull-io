@@ -156,6 +156,19 @@ export function initDb() {
       FOREIGN KEY(result_id) REFERENCES results(id)
     );
 
+    CREATE TABLE IF NOT EXISTS ip_rate_limits (
+      ip_address TEXT PRIMARY KEY,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      last_attempt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS ip_blocklist (
+      ip_address TEXT PRIMARY KEY,
+      reason TEXT NOT NULL,
+      blocked_at TEXT NOT NULL,
+      blocked_by TEXT
+    );
+
     -- Indexing for performance as audit volume grows
     CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp);
     CREATE INDEX IF NOT EXISTS idx_audit_ip ON audit_logs(ip_address);
@@ -199,6 +212,8 @@ export function initDb() {
   safeMigrate(`ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;`);
   safeMigrate(`ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0;`);
   safeMigrate(`ALTER TABLE users ADD COLUMN locked_until TEXT;`);
+  safeMigrate(`ALTER TABLE tokens ADD COLUMN dispatched_at TEXT;`);
+  safeMigrate(`ALTER TABLE tokens ADD COLUMN dispatched_to TEXT;`);
 
   // Seed Data if empty
   const userCount = db.prepare(`SELECT count(*) as count FROM users`).get();

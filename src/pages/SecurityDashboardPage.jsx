@@ -105,8 +105,50 @@ export default function SecurityDashboardPage({ currentUser }) {
     }
   };
 
+  const handleBlockIp = async (ip, reason = 'Manual block via Security Dashboard') => {
+    setError('');
+    setSuccess('');
+    try {
+      const res = await fetch('/api/security/block-ip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ip_address: ip, reason })
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      setSuccess(resData.message);
+      fetchDashboard();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleUnblockIp = async (ip) => {
+    setError('');
+    setSuccess('');
+    try {
+      const res = await fetch('/api/security/unblock-ip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ip_address: ip })
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      setSuccess(resData.message);
+      fetchDashboard();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const handleExportCsv = () => {
     window.open('/api/audit-logs/export', '_blank');
+  };
+
+  const handleExportIncidents = () => {
+    window.open('/api/security/export-incidents', '_blank');
   };
 
   if (loading && !data) {
@@ -126,7 +168,10 @@ export default function SecurityDashboardPage({ currentUser }) {
             <ShieldAlert size={14} /> Simulate Brute-Force Attack
           </button>
           <button className="btn btn-secondary btn-sm" onClick={handleExportCsv}>
-            Export Audit CSV
+            Export Audit Logs (CSV)
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={handleExportIncidents}>
+            Export Incidents (CSV)
           </button>
           <button className="btn btn-secondary btn-sm" onClick={fetchDashboard}>
             <RefreshCw size={14} /> Refresh Metrics
@@ -217,12 +262,13 @@ export default function SecurityDashboardPage({ currentUser }) {
                 <th>Total Failures</th>
                 <th>Flag Status</th>
                 <th>Last Incident</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {data?.ip_activity.length === 0 ? (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '20px' }} className="caption">
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }} className="caption">
                     No failed security events recorded.
                   </td>
                 </tr>
@@ -246,6 +292,59 @@ export default function SecurityDashboardPage({ currentUser }) {
                       )}
                     </td>
                     <td className="caption">{new Date(ipRow.last_attempt).toLocaleString()}</td>
+                    <td>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => handleBlockIp(ipRow.ip_address, `Excessive failed security attempts (${ipRow.attempt_count})`)}
+                      >
+                        Block IP
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Manual IP Blocklist Management */}
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <ShieldAlert size={18} style={{ color: 'var(--color-error)' }} />
+          <h2 className="h2">Blocked IP Address List</h2>
+        </div>
+
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Blocked IP</th>
+                <th>Reason</th>
+                <th>Blocked Date</th>
+                <th>Blocked By</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!data?.blocked_ips || data?.blocked_ips.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '20px' }} className="caption">
+                    No IP addresses currently in the manual blocklist.
+                  </td>
+                </tr>
+              ) : (
+                data?.blocked_ips.map(b => (
+                  <tr key={b.ip_address}>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{b.ip_address}</td>
+                    <td>{b.reason}</td>
+                    <td className="caption">{new Date(b.blocked_at).toLocaleString()}</td>
+                    <td>{b.blocked_by || 'Admin'}</td>
+                    <td>
+                      <button className="btn btn-secondary btn-sm" onClick={() => handleUnblockIp(b.ip_address)}>
+                        Unblock IP
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

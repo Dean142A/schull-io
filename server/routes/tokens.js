@@ -88,33 +88,47 @@ router.post('/generate', authenticateUser, requireAuth, authorize('GENERATE_TOKE
   });
 });
 
-// POST /api/tokens/dispatch - Simulate Email or SMS Token Dispatch to Parent
+// POST /api/tokens/dispatch - Dispatch Token to Parent via Email or SMS
 router.post('/dispatch', authenticateUser, requireAuth, authorize('GENERATE_TOKENS'), (req, res) => {
-  const { result_id, raw_token, channel, destination } = req.body;
+  const { token_id, result_id, raw_token, channel = 'EMAIL', email, destination } = req.body;
 
-  if (!raw_token || !channel || !destination) {
-    return res.status(400).json({ error: 'Missing required parameters: raw_token, channel, destination' });
+  let tokenRecord;
+  if (token_id) {
+    tokenRecord = db.prepare(`SELECT * FROM tokens WHERE id = ?`).get(token_id);
+  } else if (result_id) {
+    tokenRecord = db.prepare(`SELECT * FROM tokens WHERE result_id = ? ORDER BY created_at DESC`).get(result_id);
+  }
+
+  const targetResultId = tokenRecord ? tokenRecord.result_id : result_id;
+  const result = targetResultId ? db.prepare(`
+    SELECT r.id, s.parent_email, s.parent_phone, s.full_name as student_name
+    FROM results r
+    JOIN students s ON r.student_id = s.id
+    WHERE r.id = ?
+  `).get(targetResultId) : null;
+
+  const targetEmail = email || destination || result?.parent_email;
+  if (!targetEmail && !destination) {
+    return res.status(400).json({ error: 'No parent contact destination found for dispatch.' });
+  }
+
+  const nowStr = new Date().toISOString();
+  if (tokenRecord) {
+    db.prepare(`UPDATE tokens SET dispatched_at = ?, dispatched_to = ? WHERE id = ?`).run(nowStr, targetEmail || destination, tokenRecord.id);
   }
 
   const action = channel === 'SMS' ? 'TOKEN_DISPATCH_SMS' : 'TOKEN_DISPATCH_EMAIL';
-
-  recordAuditLog(req, action, {
-    result_id,
-    channel,
-    destination,
-    dispatched_at: new Date().toISOString(),
-  });
+  recordAuditLog(req, action, { token_id: tokenRecord?.id, result_id: targetResultId, channel, dispatched_to: targetEmail || destination });
 
   res.json({
-    message: `Token successfully dispatched via ${channel} to ${destination}.`,
+    message: `Token successfully dispatched via ${channel} to ${targetEmail || destination}.`,
     channel,
-    destination,
-    timestamp: new Date().toISOString(),
+    dispatched_at: nowStr,
+    dispatched_to: targetEmail || destination
   });
 });
 
-// POST /api/tokens/redeem - PUBLIC UNAUTHENTICATED PORTAL
-// Requirement 2.4: Indistinguishable errors, rate limited per IP, single-use check
+// POST /api/tokens/redeem - Anonymous Parent / Student Token Viewer Access
 router.post('/redeem', tokenRateLimiter, (req, res) => {
   const { raw_token } = req.body;
   const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';

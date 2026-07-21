@@ -732,10 +732,8 @@ export default function ResultsPage({ currentUser }) {
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
                         body: JSON.stringify({
-                          result_id: tokenModalData.result_id,
-                          raw_token: tokenModalData.raw_token,
-                          channel: 'EMAIL',
-                          destination: tokenModalData.parent_email || 'parent@example.com'
+                          token_id: tokenModalData.token_id,
+                          email: tokenModalData.parent_email || 'parent@example.com'
                         })
                       });
                       const d = await res.json();
@@ -743,7 +741,7 @@ export default function ResultsPage({ currentUser }) {
                     } catch (err) { alert(err.message); }
                   }}
                 >
-                  Email to {tokenModalData.parent_email || 'parent@example.com'}
+                  Dispatch Email to {tokenModalData.parent_email || 'parent@example.com'}
                 </button>
 
                 <button

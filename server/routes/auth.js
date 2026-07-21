@@ -3,13 +3,14 @@ import jwt from 'jsonwebtoken';
 import db, { comparePassword } from '../db.js';
 import { recordAuditLog } from '../middleware/auditLogger.js';
 import { authenticateUser, JWT_SECRET } from '../middleware/auth.js';
+import { generateBase32Secret, generateTotpCode, verifyTotpCode } from '../utils/totp.js';
 
 const router = express.Router();
 
 // GET /api/auth/demo-users (For quick UI demo switching when enabled)
 router.get('/demo-users', (req, res) => {
   const users = db.prepare(`
-    SELECT u.id, u.username, u.full_name, u.role, u.department_id, d.name as department_name, d.code as department_code
+    SELECT u.id, u.username, u.full_name, u.role, u.department_id, u.two_factor_enabled, d.name as department_name, d.code as department_code
     FROM users u
     LEFT JOIN departments d ON u.department_id = d.id
   `).all();
@@ -18,7 +19,7 @@ router.get('/demo-users', (req, res) => {
 
 // POST /api/auth/login - Strict production authentication
 router.post('/login', (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, totp_code } = req.body;
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
@@ -53,6 +54,23 @@ router.post('/login', (req, res) => {
 
     recordAuditLog(req, 'LOGIN_FAILED', { username, reason: !user ? 'User not found' : (user.is_active === 0 ? 'Account deactivated' : 'Invalid password') }, { id: 'anonymous', full_name: username || 'Unknown', role: 'Guest', department_id: null });
     return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  // Check 2FA TOTP verification requirement
+  if (user.two_factor_enabled === 1) {
+    if (!totp_code) {
+      return res.status(200).json({
+        requires_2fa: true,
+        username: user.username,
+        message: 'Two-Factor Authentication code required.'
+      });
+    }
+
+    const isTotpValid = verifyTotpCode(user.two_factor_secret, totp_code);
+    if (!isTotpValid) {
+      recordAuditLog(req, 'LOGIN_FAILED_2FA', { username: user.username, reason: 'Invalid 2FA TOTP code' }, user);
+      return res.status(401).json({ error: 'Invalid 2FA authentication code. Please check your authenticator app.' });
+    }
   }
 
   // Reset failed login attempts on successful login
@@ -154,7 +172,7 @@ router.get('/me', authenticateUser, (req, res) => {
   }
 
   const user = db.prepare(`
-    SELECT u.id, u.username, u.full_name, u.role, u.department_id, d.name as department_name, d.code as department_code
+    SELECT u.id, u.username, u.full_name, u.role, u.department_id, u.two_factor_enabled, d.name as department_name, d.code as department_code
     FROM users u
     LEFT JOIN departments d ON u.department_id = d.id
     WHERE u.id = ?
@@ -165,6 +183,71 @@ router.get('/me', authenticateUser, (req, res) => {
   }
 
   res.json({ user });
+});
+
+// POST /api/auth/2fa/setup - Generate 2FA Secret Key
+router.post('/2fa/setup', authenticateUser, (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const secret = generateBase32Secret(20);
+  const otpauthUrl = `otpauth://totp/schull:${req.user.username}?secret=${secret}&issuer=schull.io`;
+
+  db.prepare(`UPDATE users SET two_factor_secret = ? WHERE id = ?`).run(secret, req.user.id);
+
+  res.json({
+    secret,
+    otpauth_url: otpauthUrl,
+    message: '2FA secret key generated. Enter a code from your authenticator app to enable 2FA.'
+  });
+});
+
+// POST /api/auth/2fa/enable - Verify code and activate 2FA
+router.post('/2fa/enable', authenticateUser, (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const { totp_code } = req.body;
+  const user = db.prepare(`SELECT two_factor_secret FROM users WHERE id = ?`).get(req.user.id);
+
+  if (!user || !user.two_factor_secret) {
+    return res.status(400).json({ error: 'Please generate a 2FA secret key first.' });
+  }
+
+  const isValid = verifyTotpCode(user.two_factor_secret, totp_code);
+  if (!isValid) {
+    return res.status(400).json({ error: 'Invalid 2FA verification code. Check your authenticator app.' });
+  }
+
+  db.prepare(`UPDATE users SET two_factor_enabled = 1 WHERE id = ?`).run(req.user.id);
+  recordAuditLog(req, '2FA_ENABLED', { user_id: req.user.id });
+
+  res.json({ message: 'Two-factor authentication enabled successfully.' });
+});
+
+// POST /api/auth/2fa/disable - Deactivate 2FA
+router.post('/2fa/disable', authenticateUser, (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const { password, totp_code } = req.body;
+  const user = db.prepare(`SELECT password_hash, two_factor_secret FROM users WHERE id = ?`).get(req.user.id);
+
+  if (!user || !comparePassword(password || '', user.password_hash)) {
+    return res.status(401).json({ error: 'Invalid account password.' });
+  }
+
+  if (user.two_factor_secret && !verifyTotpCode(user.two_factor_secret, totp_code)) {
+    return res.status(400).json({ error: 'Invalid 2FA code.' });
+  }
+
+  db.prepare(`UPDATE users SET two_factor_enabled = 0, two_factor_secret = null WHERE id = ?`).run(req.user.id);
+  recordAuditLog(req, '2FA_DISABLED', { user_id: req.user.id });
+
+  res.json({ message: 'Two-factor authentication disabled.' });
 });
 
 export default router;
