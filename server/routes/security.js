@@ -149,29 +149,48 @@ router.post('/unlock-user', (req, res) => {
   res.json({ message: `Account for ${user.full_name} (${user.username}) has been unlocked successfully.` });
 });
 
-// PUT /api/security/settings - Update threshold / settings
+// GET /api/security/settings - Get all system security policies and rules
+router.get('/settings', (req, res) => {
+  const rows = db.prepare(`SELECT key, value FROM security_settings`).all();
+  const settings = {
+    suspicious_threshold: '5',
+    lockout_duration_mins: '15',
+    token_expiry_hours: '24',
+    single_use_strictness: 'true',
+    session_expiry_hours: '8',
+    default_dispatch_channel: 'EMAIL',
+  };
+
+  rows.forEach(r => {
+    settings[r.key] = r.value;
+  });
+
+  res.json({ settings });
+});
+
+// PUT /api/security/settings - Update system security settings & rules
 router.put('/settings', (req, res) => {
-  const { suspicious_threshold, token_expiry_hours } = req.body;
+  const allowedKeys = [
+    'suspicious_threshold',
+    'lockout_duration_mins',
+    'token_expiry_hours',
+    'single_use_strictness',
+    'session_expiry_hours',
+    'default_dispatch_channel',
+  ];
 
-  if (suspicious_threshold !== undefined) {
-    const val = parseInt(suspicious_threshold, 10);
-    if (isNaN(val) || val < 1) {
-      return res.status(400).json({ error: 'Threshold must be a positive integer.' });
+  const updated = [];
+
+  for (const key of allowedKeys) {
+    if (req.body[key] !== undefined) {
+      const val = req.body[key].toString();
+      db.prepare(`INSERT OR REPLACE INTO security_settings (key, value) VALUES (?, ?)`).run(key, val);
+      updated.push(key);
+      recordAuditLog(req, 'SECURITY_SETTING_CHANGE', { setting: key, new_value: val });
     }
-    db.prepare(`INSERT OR REPLACE INTO security_settings (key, value) VALUES ('suspicious_threshold', ?)`).run(val.toString());
-    recordAuditLog(req, 'SECURITY_SETTING_CHANGE', { setting: 'suspicious_threshold', new_value: val });
   }
 
-  if (token_expiry_hours !== undefined) {
-    const val = parseFloat(token_expiry_hours);
-    if (isNaN(val) || val <= 0) {
-      return res.status(400).json({ error: 'Token expiry hours must be greater than 0.' });
-    }
-    db.prepare(`INSERT OR REPLACE INTO security_settings (key, value) VALUES ('token_expiry_hours', ?)`).run(val.toString());
-    recordAuditLog(req, 'SECURITY_SETTING_CHANGE', { setting: 'token_expiry_hours', new_value: val });
-  }
-
-  res.json({ message: 'Security settings updated successfully.' });
+  res.json({ message: `Security settings updated successfully (${updated.length} settings modified).` });
 });
 
 // POST /api/security/simulate-attack - Interactive demo trigger for testing anomaly detection

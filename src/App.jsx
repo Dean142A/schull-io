@@ -7,6 +7,7 @@ import AuditLogsPage from './pages/AuditLogsPage';
 import SecurityDashboardPage from './pages/SecurityDashboardPage';
 import DirectoryPage from './pages/DirectoryPage';
 import LoginPage from './pages/LoginPage';
+import SettingsPage from './pages/SettingsPage';
 import ProfileModal from './components/ProfileModal';
 
 export default function App() {
@@ -98,7 +99,7 @@ export default function App() {
         <Header
           currentUser={activeTab === 'portal' ? null : currentUser}
           onLogout={handleLogout}
-          onOpenProfile={() => setProfileModalOpen(true)}
+          onOpenProfile={() => setActiveTab('settings')}
         />
 
         <main className="page-body">
@@ -107,6 +108,7 @@ export default function App() {
           {activeTab === 'portal' && <TokenPortalPage />}
           {activeTab === 'audit' && <AuditLogsPage currentUser={currentUser} />}
           {activeTab === 'security' && <SecurityDashboardPage currentUser={currentUser} />}
+          {activeTab === 'settings' && <SettingsPage currentUser={currentUser} onUpdateUser={(updatedUser) => setCurrentUser(updatedUser)} />}
         </main>
 
         <ProfileModal

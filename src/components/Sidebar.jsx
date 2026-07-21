@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, FileText, ShieldAlert, KeyRound, UserCheck, Shield, Users } from 'lucide-react';
+import { LayoutDashboard, FileText, ShieldAlert, KeyRound, UserCheck, Shield, Users, Settings } from 'lucide-react';
 
 export default function Sidebar({ activeTab, setActiveTab, currentUser, demoUsers, onSwitchUser }) {
   const isPublicPortal = activeTab === 'portal';
@@ -53,6 +53,13 @@ export default function Sidebar({ activeTab, setActiveTab, currentUser, demoUser
             <ShieldAlert className="nav-icon" /> Security Dashboard
           </div>
         )}
+
+        <div
+          className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('settings')}
+        >
+          <Settings className="nav-icon" /> Settings & Security
+        </div>
 
         <div style={{ marginTop: '24px', marginBottom: '8px', paddingLeft: '8px', textTransform: 'uppercase' }} className="caption">
           Public Access

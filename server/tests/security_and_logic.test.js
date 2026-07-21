@@ -516,5 +516,22 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       expect(exportRes.status).toBe(200);
       expect(exportRes.headers['content-type']).toMatch(/text\/csv/);
     });
+
+    it('fetches and updates system security settings & rules', async () => {
+      const getRes = await request(app)
+        .get('/api/security/settings')
+        .set('Cookie', adminCookie);
+
+      expect(getRes.status).toBe(200);
+      expect(getRes.body.settings.suspicious_threshold).toBeDefined();
+
+      const putRes = await request(app)
+        .put('/api/security/settings')
+        .set('Cookie', adminCookie)
+        .send({ lockout_duration_mins: '30', token_expiry_hours: '48' });
+
+      expect(putRes.status).toBe(200);
+      expect(putRes.body.message).toMatch(/Security settings updated/i);
+    });
   });
 });
