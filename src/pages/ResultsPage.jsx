@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import StatusBadge from '../components/StatusBadge';
+import OnboardingTour from '../components/OnboardingTour';
 import {
   Lock, CheckCircle, RotateCcw, Edit, Key, UploadCloud,
-  History, AlertCircle, Check, X, ShieldAlert, Plus, FileSpreadsheet
+  History, AlertCircle, Check, X, ShieldAlert, Plus, FileSpreadsheet, Sparkles
 } from 'lucide-react';
 
 export default function ResultsPage({ currentUser }) {
@@ -33,6 +34,43 @@ export default function ResultsPage({ currentUser }) {
   // Appeals State
   const [appeals, setAppeals] = useState([]);
   const [activeTab, setActiveTab] = useState('results'); // 'results' | 'appeals'
+
+  // Onboarding Tour State
+  const [tourOpen, setTourOpen] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem('schull_tour_results')) {
+      setTourOpen(true);
+    }
+  }, []);
+
+  const resultsTourSteps = [
+    {
+      targetId: 'tour-results-header',
+      title: 'Academic Results Directory',
+      description: 'Welcome to the Results Directory! Manage student scores through formal lifecycle states: Draft → Uploaded → Locked → Published.'
+    },
+    {
+      targetId: 'tour-upload-actions',
+      title: 'Score Upload Options',
+      description: 'Authorized staff can upload individual student grades or import entire class spreadsheets via Bulk CSV Upload.'
+    },
+    {
+      targetId: 'tour-filter-bar',
+      title: 'Search & Status Filtering',
+      description: 'Filter records by student name, code, or lifecycle status to quickly find and review grade entries.'
+    },
+    {
+      targetId: 'tour-results-table',
+      title: 'Cryptographic Tokens & Audit History',
+      description: 'Once a result is Published, generate single-use parent verification tokens or view the immutable audit trail of score modifications.'
+    },
+    {
+      targetId: 'tour-appeals-tab',
+      title: 'Result Verification Appeals',
+      description: 'Department Officers and Administrators can review and resolve grade verification appeals submitted by parents.'
+    }
+  ];
 
   const fetchAppeals = async () => {
     try {
@@ -325,14 +363,24 @@ export default function ResultsPage({ currentUser }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <OnboardingTour
+        tourKey="results"
+        steps={resultsTourSteps}
+        isOpen={tourOpen}
+        onClose={() => setTourOpen(false)}
+      />
+
       {/* Header Actions */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
+        <div id="tour-results-header">
           <h1 className="h1">Academic Results Directory</h1>
           <p className="small">Manage scores through lifecycle states: Draft → Uploaded → Locked → Published</p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px' }} id="tour-upload-actions">
+          <button className="btn btn-secondary" onClick={() => setTourOpen(true)}>
+            <Sparkles size={14} style={{ color: 'var(--color-primary)' }} /> Take Guided Tour
+          </button>
           {(currentUser.role === 'Lecturer' || currentUser.role === 'Department Officer' || currentUser.role === 'Administrator') && (
             <>
               <button className="btn btn-secondary" onClick={() => setSingleUploadOpen(true)}>
@@ -360,7 +408,7 @@ export default function ResultsPage({ currentUser }) {
       )}
 
       {/* Search & Filter Controls */}
-      <div className="card" style={{ padding: '14px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+      <div className="card" id="tour-filter-bar" style={{ padding: '14px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <input
             type="text"
@@ -372,7 +420,7 @@ export default function ResultsPage({ currentUser }) {
           />
 
           {(currentUser.role === 'Administrator' || currentUser.role === 'Department Officer') && (
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '6px' }} id="tour-appeals-tab">
               <button
                 className={`btn btn-sm ${activeTab === 'results' ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => setActiveTab('results')}
@@ -405,7 +453,7 @@ export default function ResultsPage({ currentUser }) {
 
       {/* Results Data Table */}
       {activeTab === 'results' && (
-        <div className="table-container">
+        <div className="table-container" id="tour-results-table">
         <table>
           <thead>
             <tr>

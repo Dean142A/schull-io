@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, AlertTriangle, User, Key, Settings, RefreshCw, CheckCircle, Lock, ShieldOff } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, User, Key, Settings, RefreshCw, CheckCircle, Lock, ShieldOff, Sparkles } from 'lucide-react';
+import OnboardingTour from '../components/OnboardingTour';
 
 export default function SecurityDashboardPage({ currentUser }) {
   const [data, setData] = useState(null);
@@ -7,6 +8,38 @@ export default function SecurityDashboardPage({ currentUser }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [newThreshold, setNewThreshold] = useState('');
+
+  // Onboarding Tour State
+  const [tourOpen, setTourOpen] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem('schull_tour_security')) {
+      setTourOpen(true);
+    }
+  }, []);
+
+  const securityTourSteps = [
+    {
+      targetId: 'tour-sec-header',
+      title: 'Security & Anomaly Monitoring',
+      description: 'Monitor brute-force login attempts, invalid token redemption patterns, and system-wide security violations in real time.'
+    },
+    {
+      targetId: 'tour-sec-simulate',
+      title: 'Attack Simulation Testing',
+      description: 'Test anomaly detection thresholds interactively by triggering simulated brute-force attack attempts from a mock IP address.'
+    },
+    {
+      targetId: 'tour-sec-ip-table',
+      title: 'Suspicious IP Tracking & Blocking',
+      description: 'View repeated failed logins and token reuse attempts grouped by IP address. Instantly block malicious IPs with one click.'
+    },
+    {
+      targetId: 'tour-sec-blocklist',
+      title: 'IP Blocklist & Account Unlocks',
+      description: 'Manage manually blocked IP addresses and restore staff accounts locked after 5 consecutive failed login attempts.'
+    }
+  ];
 
   const fetchDashboard = async () => {
     setLoading(true);
@@ -157,14 +190,24 @@ export default function SecurityDashboardPage({ currentUser }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <OnboardingTour
+        tourKey="security"
+        steps={securityTourSteps}
+        isOpen={tourOpen}
+        onClose={() => setTourOpen(false)}
+      />
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
+        <div id="tour-sec-header">
           <h1 className="h1">Security & Anomaly Monitoring Dashboard</h1>
           <p className="small">Surfaces suspicious activity, brute-force IP patterns, and staff token generation volume.</p>
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-danger btn-sm" onClick={handleSimulateAttack} title="Fires 6 simulated failed token attempts from IP 198.51.100.42">
+          <button className="btn btn-secondary btn-sm" onClick={() => setTourOpen(true)}>
+            <Sparkles size={14} style={{ color: 'var(--color-primary)' }} /> Take Guided Tour
+          </button>
+          <button id="tour-sec-simulate" className="btn btn-danger btn-sm" onClick={handleSimulateAttack} title="Fires 6 simulated failed token attempts from IP 198.51.100.42">
             <ShieldAlert size={14} /> Simulate Brute-Force Attack
           </button>
           <button className="btn btn-secondary btn-sm" onClick={handleExportCsv}>
@@ -245,7 +288,7 @@ export default function SecurityDashboardPage({ currentUser }) {
       </div>
 
       {/* Suspicious & Repeated Failed Attempts by IP */}
-      <div className="card">
+      <div className="card" id="tour-sec-ip-table">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
           <ShieldAlert size={18} style={{ color: 'var(--color-error)' }} />
           <h2 className="h2">Repeated Failed Login & Token Attempts (Grouped by IP)</h2>
@@ -309,7 +352,7 @@ export default function SecurityDashboardPage({ currentUser }) {
       </div>
 
       {/* Manual IP Blocklist Management */}
-      <div className="card">
+      <div className="card" id="tour-sec-blocklist">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
           <ShieldAlert size={18} style={{ color: 'var(--color-error)' }} />
           <h2 className="h2">Blocked IP Address List</h2>

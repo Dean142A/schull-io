@@ -1,11 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { Users, BookOpen, Building2, Search, RefreshCw, Plus, CheckCircle, AlertCircle, X, Edit } from 'lucide-react';
+import { Users, BookOpen, Building2, Search, RefreshCw, Plus, CheckCircle, AlertCircle, X, Edit, Sparkles } from 'lucide-react';
+import OnboardingTour from '../components/OnboardingTour';
 
 export default function DirectoryPage({ currentUser }) {
   const [data, setData] = useState({ students: [], courses: [], departments: [], lecturers: [] });
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('students');
   const [search, setSearch] = useState('');
+
+  // Onboarding Tour State
+  const [tourOpen, setTourOpen] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem('schull_tour_directory')) {
+      setTourOpen(true);
+    }
+  }, []);
+
+  const directoryTourSteps = [
+    {
+      targetId: 'tour-dir-header',
+      title: 'Academic Registry Directory',
+      description: 'Manage student profiles, parent contact channels for token delivery, and department course assignments.'
+    },
+    {
+      targetId: 'tour-dir-actions',
+      title: 'Register Students & Courses',
+      description: 'Department Officers and Admins can register new students with parent contact emails and create department courses.'
+    },
+    {
+      targetId: 'tour-dir-table',
+      title: 'Student Contact & Course Roster',
+      description: 'View student matriculation codes, parent email/phone contact details, and assigned course lecturers.'
+    }
+  ];
 
   // Modals state
   const [showStudentModal, setShowStudentModal] = useState(false);
@@ -167,13 +195,23 @@ export default function DirectoryPage({ currentUser }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <OnboardingTour
+        tourKey="directory"
+        steps={directoryTourSteps}
+        isOpen={tourOpen}
+        onClose={() => setTourOpen(false)}
+      />
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
+        <div id="tour-dir-header">
           <h1 className="h1">Academic Registry & Course Directory</h1>
           <p className="small">Manage registered students, parent contact channels, and course lecturer assignments.</p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px' }} id="tour-dir-actions">
+          <button className="btn btn-secondary" onClick={() => setTourOpen(true)}>
+            <Sparkles size={14} style={{ color: 'var(--color-primary)' }} /> Take Guided Tour
+          </button>
           {isStaffManager && (
             <>
               <button className="btn btn-primary" onClick={() => setShowStudentModal(true)}>
@@ -232,7 +270,7 @@ export default function DirectoryPage({ currentUser }) {
 
       {/* Students Table */}
       {tab === 'students' && (
-        <div className="table-container">
+        <div className="table-container" id="tour-dir-table">
           <table>
             <thead>
               <tr>
