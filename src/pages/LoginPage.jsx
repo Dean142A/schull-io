@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, User, KeyRound, AlertCircle, ArrowRight, ShieldCheck, Check } from 'lucide-react';
+import PasswordInput from '../components/PasswordInput';
 
 export default function LoginPage({ onLoginSuccess, demoUsers = [] }) {
   const [username, setUsername] = useState('');
@@ -113,18 +114,11 @@ export default function LoginPage({ onLoginSuccess, demoUsers = [] }) {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label className="label">Password</label>
-                <div style={{ position: 'relative' }}>
-                  <Lock size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--color-muted)' }} />
-                  <input
-                    type="password"
-                    className="form-control"
-                    placeholder="••••••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    style={{ paddingLeft: '38px' }}
-                  />
-                </div>
+                <PasswordInput
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
               </div>
 
               <button

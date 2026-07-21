@@ -3,7 +3,8 @@ import StatusBadge from '../components/StatusBadge';
 import OnboardingTour from '../components/OnboardingTour';
 import {
   Lock, CheckCircle, RotateCcw, Edit, Key, UploadCloud,
-  History, AlertCircle, Check, X, ShieldAlert, Plus, FileSpreadsheet, Sparkles
+  History, AlertCircle, Check, X, ShieldAlert, Plus, FileSpreadsheet, Sparkles,
+  Download, Award, TrendingUp, AlertTriangle, BookOpen
 } from 'lucide-react';
 
 export default function ResultsPage({ currentUser }) {
@@ -352,6 +353,41 @@ export default function ResultsPage({ currentUser }) {
     }
   };
 
+  // Lecturer Gradebook & Class Analytics Calculations
+  const isLecturer = currentUser?.role === 'Lecturer';
+
+  const scoresList = results.map(r => Number(r.score) || 0);
+  const totalStudents = scoresList.length;
+  const avgScore = totalStudents > 0 ? (scoresList.reduce((a, b) => a + b, 0) / totalStudents).toFixed(1) : 0;
+  const highestScore = totalStudents > 0 ? Math.max(...scoresList).toFixed(1) : 0;
+  const lowestScore = totalStudents > 0 ? Math.min(...scoresList).toFixed(1) : 0;
+  const passCount = scoresList.filter(s => s >= 40.0).length;
+  const passRate = totalStudents > 0 ? Math.round((passCount / totalStudents) * 100) : 0;
+  const lowScoreAlerts = results.filter(r => Number(r.score) < 40.0);
+
+  const gradeCounts = {
+    A: scoresList.filter(s => s >= 70).length,
+    B: scoresList.filter(s => s >= 60 && s < 70).length,
+    C: scoresList.filter(s => s >= 50 && s < 60).length,
+    D: scoresList.filter(s => s >= 45 && s < 50).length,
+    E: scoresList.filter(s => s >= 40 && s < 45).length,
+    F: scoresList.filter(s => s < 40).length,
+  };
+
+  const handleDownloadLecturerCsvTemplate = () => {
+    let csv = 'student_code,student_name,course_code,session,semester,score\n';
+    results.forEach(r => {
+      csv += `"${r.student_code}","${r.student_name}","${r.course_code}","2025/2026","First","${r.score}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Lecturer_Gradebook_Template_${currentUser?.username || 'staff'}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const filteredResults = results.filter(r => {
     const matchesSearch =
       r.student_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -393,6 +429,68 @@ export default function ResultsPage({ currentUser }) {
           )}
         </div>
       </div>
+
+      {/* Lecturer Dedicated Class Analytics & Gradebook Hub */}
+      {isLecturer && (
+        <div className="card" style={{ padding: '20px', background: 'linear-gradient(135deg, #FAF8FF 0%, #FFFFFF 100%)', border: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ padding: '8px', background: 'var(--color-primary-subtle)', borderRadius: '8px', color: 'var(--color-primary)' }}>
+                <BookOpen size={20} />
+              </div>
+              <div>
+                <h2 className="h2">Lecturer Gradebook & Class Performance Hub</h2>
+                <p className="small">Teaching Staff Workspace &bull; Assigned Course Analytics & Course CSV Template Exporter</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="btn btn-secondary btn-sm" onClick={handleDownloadLecturerCsvTemplate}>
+                <Download size={14} /> Download Course CSV Template
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Metrics Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ padding: '14px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)' }}>
+              <span className="caption">Class Average Score</span>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-primary)', marginTop: '2px' }}>{avgScore} / 100</div>
+            </div>
+
+            <div style={{ padding: '14px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)' }}>
+              <span className="caption">Class Pass Rate</span>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-success)', marginTop: '2px' }}>{passRate}%</div>
+            </div>
+
+            <div style={{ padding: '14px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)' }}>
+              <span className="caption">Highest / Lowest Score</span>
+              <div style={{ fontSize: '18px', fontWeight: 700, marginTop: '2px' }}>{highestScore} / {lowestScore}</div>
+            </div>
+
+            <div style={{ padding: '14px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)' }}>
+              <span className="caption">Low-Score Warnings (&lt;40)</span>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: lowScoreAlerts.length > 0 ? 'var(--color-error)' : 'var(--color-muted)', marginTop: '2px' }}>
+                {lowScoreAlerts.length} Student{lowScoreAlerts.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          </div>
+
+          {/* Grade Distribution Bar */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span className="caption" style={{ fontWeight: 600 }}>Grade Distribution (A: 70+ | B: 60-69 | C: 50-59 | D: 45-49 | E: 40-44 | F: &lt;40)</span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {Object.entries(gradeCounts).map(([grade, count]) => (
+                <div key={grade} className="badge" style={{ background: grade === 'F' && count > 0 ? '#FEF2F2' : 'var(--color-canvas)', color: grade === 'F' && count > 0 ? 'var(--color-error)' : 'var(--color-ink)', border: '1px solid var(--color-border)' }}>
+                  <strong>{grade}:</strong> {count} Student{count !== 1 ? 's' : ''}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Global Alerts */}
       {error && (

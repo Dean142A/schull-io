@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Lock, ShieldCheck, Sliders, Send, KeyRound, Check, AlertCircle, RefreshCw, Key, FileText, CheckCircle } from 'lucide-react';
+import PasswordInput from '../components/PasswordInput';
 
 export default function SettingsPage({ currentUser, onUpdateUser }) {
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' | '2fa' | 'policies' | 'notifications'
@@ -326,9 +327,7 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label className="label">Current Password</label>
-                    <input
-                      type="password"
-                      className="form-control"
+                    <PasswordInput
                       placeholder="Current password"
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
@@ -338,9 +337,7 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label className="label">New Password</label>
-                      <input
-                        type="password"
-                        className="form-control"
+                      <PasswordInput
                         placeholder="Min 6 chars"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
@@ -349,9 +346,7 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
 
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label className="label">Confirm New Password</label>
-                      <input
-                        type="password"
-                        className="form-control"
+                      <PasswordInput
                         placeholder="Repeat new password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
