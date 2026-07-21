@@ -102,18 +102,15 @@ export default function OnboardingTour({ tourKey, steps = [], isOpen, onClose, o
 
   return (
     <>
-      {/* Backdrop Blur Overlay */}
-      <div className="tour-backdrop-overlay" />
-
-      {/* Spotlight Box Cutout (No Stroke, Dark Background Overlay) */}
+      {/* Spotlight Box Cutout (Sharp, Crisp Target Highlight with Dark Screen Overlay) */}
       {targetRect && (
         <div
           className="tour-spotlight-box"
           style={{
-            top: `${targetRect.top - 4}px`,
-            left: `${targetRect.left - 4}px`,
-            width: `${targetRect.width + 8}px`,
-            height: `${targetRect.height + 8}px`,
+            top: `${targetRect.top - 6}px`,
+            left: `${targetRect.left - 6}px`,
+            width: `${targetRect.width + 12}px`,
+            height: `${targetRect.height + 12}px`,
           }}
         />
       )}

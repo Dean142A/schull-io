@@ -1,24 +1,13 @@
-/* schull.io Onboarding Tour Styles (Clean & Dark Blur, No Strokes, No Glows) */
+/* schull.io Onboarding Tour Styles (Clean Dark Backdrop Cutout - Sharp Highlighted Target) */
 
-.tour-backdrop-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 9998;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  pointer-events: none;
-}
-
-/* Clean Spotlight Box Cutout around Active Element (No stroke, No border glow) */
+/* Spotlight Box Cutout around Active Element (Sharp, Crisp, Unblurred Target Content) */
 .tour-spotlight-box {
   position: fixed;
   z-index: 9999;
   border-radius: var(--radius-card);
   border: none;
-  box-shadow: 0 0 0 9999px rgba(10, 10, 14, 0.82);
+  background: transparent;
+  box-shadow: 0 0 0 9999px rgba(10, 10, 14, 0.78);
   pointer-events: auto;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
