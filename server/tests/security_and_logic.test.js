@@ -610,5 +610,39 @@ describe('schull.io Security & System Correctness Test Suite', () => {
       expect(res.body.student.student_code).toBe('STU/2026/001');
       expect(res.body.results).toBeDefined();
     });
+
+    it('regenerates result checksum on Admin override score updates of already published results', async () => {
+      // 1. Fetch current version of published result res-101
+      const getRes = await request(app)
+        .get('/api/results/res-101')
+        .set('Cookie', adminCookie);
+      
+      const currentVersion = getRes.body.result.version;
+
+      // 2. Perform Admin override edit on res-101
+      const editRes = await request(app)
+        .put('/api/results/res-101')
+        .set('Cookie', adminCookie)
+        .send({
+          score: 95.0,
+          version: currentVersion,
+          reason: 'Correcting score typo after supervisor review',
+          remark: 'A++ level work'
+        });
+
+      expect(editRes.status).toBe(200);
+
+      // 3. Verify public transcript authenticity check is authentic (checksum regenerated successfully!)
+      const verifyRes = await request(app)
+        .get('/api/tokens/verify-transcript/STU-2026-001');
+
+      expect(verifyRes.status).toBe(200);
+      expect(verifyRes.body.status).toBe('AUTHENTIC');
+      
+      const res101 = verifyRes.body.results.find(r => r.course_code === 'CS101');
+      expect(res101).toBeDefined();
+      expect(res101.score).toBe(95.0);
+      expect(res101.isIntact).toBe(true);
+    });
   });
 });

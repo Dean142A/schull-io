@@ -453,9 +453,10 @@ router.put('/:id', authorize('MODIFY_RESULTS'), (req, res) => {
   }
 
   const existing = db.prepare(`
-    SELECT r.*, c.department_id as course_dept_id, c.lecturer_id
+    SELECT r.*, c.department_id as course_dept_id, c.lecturer_id, c.code as course_code, s.student_code
     FROM results r
     JOIN courses c ON r.course_id = c.id
+    JOIN students s ON r.student_id = s.id
     WHERE r.id = ?
   `).get(resultId);
 
@@ -516,6 +517,14 @@ router.put('/:id', authorize('MODIFY_RESULTS'), (req, res) => {
       existing.score, numScore, existing.status, existing.status,
       reason || 'Routine score update', new Date().toISOString()
     );
+
+    if (existing.status === 'Published') {
+      const checksum = calculateResultChecksum(existing.student_code, existing.course_code, numScore, existing.session, existing.semester);
+      db.prepare(`
+        INSERT OR REPLACE INTO result_checksums (result_id, sha256_hash, generated_at)
+        VALUES (?, ?, ?)
+      `).run(resultId, checksum, new Date().toISOString());
+    }
 
     recordAuditLog(req, isLockedOrPublished ? 'ADMIN_OVERRIDE_MODIFY_RESULT' : 'UPDATE_RESULT_SCORE', {
       result_id: resultId, old_score: existing.score, new_score: numScore, reason, version: newVersion

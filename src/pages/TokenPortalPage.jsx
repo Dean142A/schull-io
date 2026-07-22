@@ -167,7 +167,7 @@ export default function TokenPortalPage() {
     doc.line(20, 68, 190, 68);
     doc.text(`Course Code: ${result.course_code}`, 20, 78);
     doc.text(`Course Title: ${result.course_title}`, 20, 86);
-    doc.text(`Academic Period: ${result.session} (${result.semester} Semester)`, 20, 94);
+    doc.text(`Academic Period: ${result.session} (${result.semester} Term)`, 20, 94);
 
     doc.setFillColor(245, 243, 255);
     doc.rect(20, 105, 170, 35, 'F');
@@ -456,7 +456,7 @@ export default function TokenPortalPage() {
             <div style={{ background: 'var(--color-canvas)', padding: '12px', borderRadius: '6px', border: '1px solid var(--color-border)' }}>
               <div className="caption">Academic Period</div>
               <div style={{ fontWeight: 700, fontSize: '15px', marginTop: '2px' }}>{result.session}</div>
-              <div className="caption" style={{ color: 'var(--color-ink)' }}>{result.semester} Semester</div>
+              <div className="caption" style={{ color: 'var(--color-ink)' }}>{result.semester} Term</div>
             </div>
           </div>
 
