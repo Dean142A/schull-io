@@ -369,18 +369,37 @@ router.post('/bulk-upload', authorize('MODIFY_RESULTS'), upload.single('file'), 
       }
       seenInBatch.add(batchKey);
 
-      // Case-Insensitive Student Lookup
-      const student = db.prepare(`SELECT id, department_id FROM students WHERE UPPER(student_code) = UPPER(?)`).get(student_code);
-      if (!student) {
-        errorReports.push({ row: row.rowIndex, error: `Student code '${student_code}' not found` });
-        continue;
-      }
-
       // Case-Insensitive Course Lookup
       const course = db.prepare(`SELECT id, department_id, lecturer_id FROM courses WHERE UPPER(code) = UPPER(?)`).get(course_code);
       if (!course) {
         errorReports.push({ row: row.rowIndex, error: `Course code '${course_code}' not found` });
         continue;
+      }
+
+      // Case-Insensitive Student Lookup & Auto-creation
+      let student = db.prepare(`SELECT id, department_id FROM students WHERE UPPER(student_code) = UPPER(?)`).get(student_code);
+      if (!student) {
+        const newStudentId = 'stu-' + crypto.randomUUID();
+        const studentName = row.student_name?.trim() || row.full_name?.trim() || row.name?.trim() || `Student ${student_code}`;
+        
+        let deptId = course.department_id;
+        const deptInput = row.department?.trim() || row.department_code?.trim() || row.department_id?.trim();
+        if (deptInput) {
+          const matchingDept = db.prepare(`SELECT id FROM departments WHERE UPPER(code) = UPPER(?) OR UPPER(name) = UPPER(?)`).get(deptInput, deptInput);
+          if (matchingDept) {
+            deptId = matchingDept.id;
+          }
+        }
+        
+        const parentEmail = row.parent_email?.trim() || row.email?.trim() || null;
+        const parentPhone = row.parent_phone?.trim() || row.phone?.trim() || null;
+
+        db.prepare(`
+          INSERT INTO students (id, student_code, full_name, department_id, parent_email, parent_phone)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(newStudentId, student_code, studentName, deptId, parentEmail, parentPhone);
+        
+        student = { id: newStudentId, department_id: deptId };
       }
 
       // Scope Check

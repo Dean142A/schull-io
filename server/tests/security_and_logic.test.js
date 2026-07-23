@@ -227,19 +227,20 @@ describe('schull.io Security & System Correctness Test Suite', () => {
   });
 
   describe('5. Bulk Upload CSV Edge Cases & Score Rounding', () => {
-    it('rounds score to 1 decimal place and detects duplicate rows within the same CSV batch', async () => {
+    it('rounds score to 1 decimal place, detects duplicate rows, and auto-registers new students', async () => {
       const res = await request(app)
         .post('/api/results/bulk-upload')
         .set('Cookie', adminCookie)
         .send({
           rows: [
             { student_code: 'stu/2026/002', course_code: 'cs302', score: 88.5499, session: '2025/2026', semester: 'First' },
-            { student_code: 'STU/2026/002', course_code: 'CS302', score: 95.0, session: '2025/2026', semester: 'First' } // Batch duplicate
+            { student_code: 'STU/2026/002', course_code: 'CS302', score: 95.0, session: '2025/2026', semester: 'First' }, // Batch duplicate
+            { student_code: 'STU/2026/999', student_name: 'Autocreated Student', parent_email: 'parent999@test.com', parent_phone: '555-9999', course_code: 'cs302', score: 91.2, session: '2025/2026', semester: 'First' } // Auto-registration
           ]
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.successes.length).toBe(1);
+      expect(res.body.successes.length).toBe(2);
       expect(res.body.errors.length).toBe(1);
       expect(res.body.errors[0].error).toMatch(/Duplicate entry/i);
 
@@ -249,6 +250,13 @@ describe('schull.io Security & System Correctness Test Suite', () => {
         .set('Cookie', adminCookie);
 
       expect(checkRes.body.result.score).toBe(88.5);
+
+      // Verify auto-registered student is in database
+      const newStudent = db.prepare("SELECT * FROM students WHERE student_code = 'STU/2026/999'").get();
+      expect(newStudent).toBeDefined();
+      expect(newStudent.full_name).toBe('Autocreated Student');
+      expect(newStudent.parent_email).toBe('parent999@test.com');
+      expect(newStudent.parent_phone).toBe('555-9999');
     });
   });
 
