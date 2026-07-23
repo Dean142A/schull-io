@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Search, Filter, RefreshCw, AlertCircle } from 'lucide-react';
+import Skeleton from '../components/Skeleton';
 
 export default function AuditLogsPage({ currentUser }) {
   const [logs, setLogs] = useState([]);
@@ -137,11 +138,16 @@ export default function AuditLogsPage({ currentUser }) {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }} className="caption">
-                  Loading activity logs...
-                </td>
-              </tr>
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i}>
+                  <td><Skeleton width={140} /></td>
+                  <td><Skeleton width={120} /></td>
+                  <td><Skeleton width={90} /></td>
+                  <td><Skeleton width={150} /></td>
+                  <td><Skeleton width={110} /></td>
+                  <td><Skeleton width={260} /></td>
+                </tr>
+              ))
             ) : logs.length === 0 ? (
               <tr>
                 <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }} className="caption">

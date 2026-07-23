@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Lock, ShieldCheck, Sliders, Send, KeyRound, Check, AlertCircle, RefreshCw, Key, FileText, CheckCircle } from 'lucide-react';
 import PasswordInput from '../components/PasswordInput';
+import Skeleton from '../components/Skeleton';
 
 export default function SettingsPage({ currentUser, onUpdateUser }) {
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' | '2fa' | 'policies' | 'notifications'
@@ -35,11 +36,13 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
   });
 
   const [loading, setLoading] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   // Fetch System Security Settings
   const fetchSettings = async () => {
+    setSettingsLoading(true);
     try {
       const res = await fetch('/api/security/settings', { credentials: 'include' });
       if (res.ok) {
@@ -48,6 +51,8 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
       }
     } catch (err) {
       console.error('Failed to load security settings:', err);
+    } finally {
+      setSettingsLoading(false);
     }
   };
 
@@ -542,104 +547,111 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
         <form onSubmit={handlePoliciesSubmit} className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <h2 className="h2">System-Wide Security Rules & Anomaly Enforcement</h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label className="label">IP Anomaly Rate Limit Threshold (Attempts)</label>
-              <select
-                className="form-control"
-                value={systemSettings.suspicious_threshold}
-                onChange={(e) => setSystemSettings(prev => ({ ...prev, suspicious_threshold: e.target.value }))}
-              >
-                <option value="3">3 Failed Attempts (Strict)</option>
-                <option value="5">5 Failed Attempts (Standard)</option>
-                <option value="10">10 Failed Attempts (Relaxed)</option>
-              </select>
-              <span className="caption">Max invalid logins or token redemptions from an IP before throttling.</span>
+          {settingsLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <Skeleton width={180} />
+                    <Skeleton height={38} />
+                    <Skeleton width={220} style={{ marginTop: '4px' }} />
+                  </div>
+                ))}
+              </div>
+              <Skeleton height={50} />
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <Skeleton width={200} height={38} />
+                <Skeleton width={180} height={38} />
+              </div>
             </div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="label">IP Anomaly Rate Limit Threshold (Attempts)</label>
+                  <select
+                    className="form-control"
+                    value={systemSettings.suspicious_threshold}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, suspicious_threshold: e.target.value }))}
+                  >
+                    <option value="3">3 Failures (Strict)</option>
+                    <option value="5">5 Failures (Standard)</option>
+                    <option value="10">10 Failures (NAT / Carrier Shared)</option>
+                  </select>
+                  <span className="caption">Failed login or token attempts before IP lock.</span>
+                </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label className="label">Account Lockout Duration (Minutes)</label>
-              <select
-                className="form-control"
-                value={systemSettings.lockout_duration_mins}
-                onChange={(e) => setSystemSettings(prev => ({ ...prev, lockout_duration_mins: e.target.value }))}
-              >
-                <option value="15">15 Minutes (Standard)</option>
-                <option value="30">30 Minutes</option>
-                <option value="60">60 Minutes (High Security)</option>
-              </select>
-              <span className="caption">Duration user account is locked after 5 failed password/TOTP attempts.</span>
-            </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="label">Verification Token Expiry (Hours)</label>
+                  <select
+                    className="form-control"
+                    value={systemSettings.token_expiry_hours}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, token_expiry_hours: e.target.value }))}
+                  >
+                    <option value="12">12 Hours</option>
+                    <option value="24">24 Hours (Standard)</option>
+                    <option value="48">48 Hours</option>
+                    <option value="72">72 Hours (3 Days)</option>
+                  </select>
+                  <span className="caption">Lifespan of generated parent result verification tokens.</span>
+                </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label className="label">Verification Token Expiry (Hours)</label>
-              <select
-                className="form-control"
-                value={systemSettings.token_expiry_hours}
-                onChange={(e) => setSystemSettings(prev => ({ ...prev, token_expiry_hours: e.target.value }))}
-              >
-                <option value="12">12 Hours</option>
-                <option value="24">24 Hours (Standard)</option>
-                <option value="48">48 Hours</option>
-                <option value="72">72 Hours (3 Days)</option>
-              </select>
-              <span className="caption">Lifespan of generated parent result verification tokens.</span>
-            </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="label">JWT Staff Session Cookie Expiry (Hours)</label>
+                  <select
+                    className="form-control"
+                    value={systemSettings.session_expiry_hours}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, session_expiry_hours: e.target.value }))}
+                  >
+                    <option value="4">4 Hours (Strict)</option>
+                    <option value="8">8 Hours (Standard Shift)</option>
+                    <option value="24">24 Hours</option>
+                  </select>
+                  <span className="caption">Duration before staff must re-authenticate.</span>
+                </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label className="label">JWT Staff Session Cookie Expiry (Hours)</label>
-              <select
-                className="form-control"
-                value={systemSettings.session_expiry_hours}
-                onChange={(e) => setSystemSettings(prev => ({ ...prev, session_expiry_hours: e.target.value }))}
-              >
-                <option value="4">4 Hours (Strict)</option>
-                <option value="8">8 Hours (Standard Shift)</option>
-                <option value="24">24 Hours</option>
-              </select>
-              <span className="caption">Duration before staff must re-authenticate.</span>
-            </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="label">Audit Log Retention Window</label>
+                  <select
+                    className="form-control"
+                    value={systemSettings.log_retention_days || '90'}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, log_retention_days: e.target.value }))}
+                  >
+                    <option value="0">Indefinite (Keep All Logs)</option>
+                    <option value="30">30 Days</option>
+                    <option value="90">90 Days (Recommended)</option>
+                    <option value="365">365 Days (1 Year)</option>
+                  </select>
+                  <span className="caption">Automatically purge older logs from database during background cleanups.</span>
+                </div>
+              </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label className="label">Audit Log Retention Window</label>
-              <select
-                className="form-control"
-                value={systemSettings.log_retention_days || '90'}
-                onChange={(e) => setSystemSettings(prev => ({ ...prev, log_retention_days: e.target.value }))}
-              >
-                <option value="0">Indefinite (Keep All Logs)</option>
-                <option value="30">30 Days</option>
-                <option value="90">90 Days (Recommended)</option>
-                <option value="365">365 Days (1 Year)</option>
-              </select>
-              <span className="caption">Automatically purge older logs from database during background cleanups.</span>
-            </div>
-          </div>
+              <div style={{ padding: '16px', background: 'var(--color-canvas)', borderRadius: 'var(--radius-card)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>Audit Trail Immutability Protection</div>
+                  <div className="caption">SQLite triggers prevent any DELETE or UPDATE statements on audit logs.</div>
+                </div>
+                <span className="badge badge-published">
+                  <CheckCircle size={12} /> SQL Triggers Enforced
+                </span>
+              </div>
 
-          <div style={{ padding: '16px', background: 'var(--color-canvas)', borderRadius: 'var(--radius-card)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontWeight: 700 }}>Audit Trail Immutability Protection</div>
-              <div className="caption">SQLite triggers prevent any DELETE or UPDATE statements on audit logs.</div>
-            </div>
-            <span className="badge badge-published">
-              <CheckCircle size={12} /> SQL Triggers Enforced
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Saving Security Policies...' : 'Save System Security Policies'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={handleTriggerPurge}
-              disabled={loading}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-            >
-              <RefreshCw size={14} className={loading ? "spin" : ""} /> Run Log Purge Job Now
-            </button>
-          </div>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button type="submit" className="btn btn-primary" disabled={loading}>
+                  {loading ? 'Saving Security Policies...' : 'Save System Security Policies'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleTriggerPurge}
+                  disabled={loading}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <RefreshCw size={14} className={loading ? "spin" : ""} /> Run Log Purge Job Now
+                </button>
+              </div>
+            </>
+          )}
         </form>
       )}
 
@@ -648,91 +660,113 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
         <form onSubmit={handlePoliciesSubmit} className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <h2 className="h2">Parent Dispatch & Notification Rules</h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <label className="label">Default Token Delivery Channel</label>
-              <div style={{ display: 'flex', gap: '16px', marginTop: '6px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="channel"
-                    value="EMAIL"
-                    checked={systemSettings.default_dispatch_channel === 'EMAIL'}
-                    onChange={() => setSystemSettings(prev => ({ ...prev, default_dispatch_channel: 'EMAIL' }))}
-                  />
-                  <span style={{ fontWeight: 600 }}>Parent Email Dispatch (Primary)</span>
-                </label>
+          {settingsLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <Skeleton width={180} />
+                    <Skeleton height={38} />
+                    <Skeleton width={220} style={{ marginTop: '4px' }} />
+                  </div>
+                ))}
+              </div>
+              <Skeleton height={50} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <Skeleton width={180} />
+                <Skeleton height={100} />
+              </div>
+              <Skeleton width={180} height={38} />
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <label className="label">Default Token Delivery Channel</label>
+                  <div style={{ display: 'flex', gap: '16px', marginTop: '6px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="channel"
+                        value="EMAIL"
+                        checked={systemSettings.default_dispatch_channel === 'EMAIL'}
+                        onChange={() => setSystemSettings(prev => ({ ...prev, default_dispatch_channel: 'EMAIL' }))}
+                      />
+                      <span style={{ fontWeight: 600 }}>Parent Email Dispatch (Primary)</span>
+                    </label>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="channel"
+                        value="SMS"
+                        checked={systemSettings.default_dispatch_channel === 'SMS'}
+                        onChange={() => setSystemSettings(prev => ({ ...prev, default_dispatch_channel: 'SMS' }))}
+                      />
+                      <span style={{ fontWeight: 600 }}>SMS Dispatch (Secondary)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="label">Max Daily Token Dispatches per Student</label>
+                  <select
+                    className="form-control"
+                    value={systemSettings.token_dispatch_limit_daily}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, token_dispatch_limit_daily: e.target.value }))}
+                  >
+                    <option value="3">3 Dispatches per Day</option>
+                    <option value="5">5 Dispatches per Day (Standard)</option>
+                    <option value="10">10 Dispatches per Day (High Volume)</option>
+                  </select>
+                  <span className="caption">Maximum tokens that can be requested per parent profile per 24 hours.</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="label">Consecutive Token Cooldown Duration</label>
+                  <select
+                    className="form-control"
+                    value={systemSettings.token_dispatch_cooldown_mins}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, token_dispatch_cooldown_mins: e.target.value }))}
+                  >
+                    <option value="1">1 Minute</option>
+                    <option value="5">5 Minutes (Standard)</option>
+                    <option value="15">15 Minutes</option>
+                  </select>
+                  <span className="caption">Enforces a wait time between consecutive dispatches to prevent spam.</span>
+                </div>
+              </div>
+
+              <div style={{ padding: '16px', background: 'var(--color-canvas)', borderRadius: 'var(--radius-card)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>Auto-Invalidation of Previous Tokens</div>
+                  <div className="caption">When a new token is generated, automatically invalidate any previous unused tokens for the same result.</div>
+                </div>
+                <label className="switch-container">
                   <input
-                    type="radio"
-                    name="channel"
-                    value="SMS"
-                    checked={systemSettings.default_dispatch_channel === 'SMS'}
-                    onChange={() => setSystemSettings(prev => ({ ...prev, default_dispatch_channel: 'SMS' }))}
+                    type="checkbox"
+                    checked={systemSettings.auto_invalidate_previous_tokens === 'true'}
+                    onChange={(e) => setSystemSettings(prev => ({ ...prev, auto_invalidate_previous_tokens: e.target.checked ? 'true' : 'false' }))}
                   />
-                  <span style={{ fontWeight: 600 }}>SMS Dispatch (Secondary)</span>
+                  <span className="switch-slider"></span>
                 </label>
               </div>
-            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label className="label">Max Daily Token Dispatches per Student</label>
-              <select
-                className="form-control"
-                value={systemSettings.token_dispatch_limit_daily}
-                onChange={(e) => setSystemSettings(prev => ({ ...prev, token_dispatch_limit_daily: e.target.value }))}
-              >
-                <option value="3">3 Dispatches per Day</option>
-                <option value="5">5 Dispatches per Day (Standard)</option>
-                <option value="10">10 Dispatches per Day (High Volume)</option>
-              </select>
-              <span className="caption">Maximum tokens that can be requested per parent profile per 24 hours.</span>
-            </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="label">Parent Token Email Disclaimer Footer Template</label>
+                <textarea
+                  className="form-control"
+                  rows={4}
+                  value={systemSettings.disclaimer_template || ''}
+                  onChange={(e) => setSystemSettings(prev => ({ ...prev, disclaimer_template: e.target.value }))}
+                />
+              </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label className="label">Consecutive Token Cooldown Duration</label>
-              <select
-                className="form-control"
-                value={systemSettings.token_dispatch_cooldown_mins}
-                onChange={(e) => setSystemSettings(prev => ({ ...prev, token_dispatch_cooldown_mins: e.target.value }))}
-              >
-                <option value="1">1 Minute</option>
-                <option value="5">5 Minutes (Standard)</option>
-                <option value="15">15 Minutes</option>
-              </select>
-              <span className="caption">Enforces a wait time between consecutive dispatches to prevent spam.</span>
-            </div>
-          </div>
-
-          <div style={{ padding: '16px', background: 'var(--color-canvas)', borderRadius: 'var(--radius-card)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontWeight: 700 }}>Auto-Invalidation of Previous Tokens</div>
-              <div className="caption">When a new token is generated, automatically invalidate any previous unused tokens for the same result.</div>
-            </div>
-            <label className="switch-container">
-              <input
-                type="checkbox"
-                checked={systemSettings.auto_invalidate_previous_tokens === 'true'}
-                onChange={(e) => setSystemSettings(prev => ({ ...prev, auto_invalidate_previous_tokens: e.target.checked ? 'true' : 'false' }))}
-              />
-              <span className="switch-slider"></span>
-            </label>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label className="label">Parent Token Email Disclaimer Footer Template</label>
-            <textarea
-              className="form-control"
-              rows={4}
-              value={systemSettings.disclaimer_template || ''}
-              onChange={(e) => setSystemSettings(prev => ({ ...prev, disclaimer_template: e.target.value }))}
-            />
-          </div>
-
-          <button type="submit" className="btn btn-primary" disabled={loading} style={{ alignSelf: 'flex-start' }}>
-            Save Notification Rules
-          </button>
+              <button type="submit" className="btn btn-primary" disabled={loading} style={{ alignSelf: 'flex-start' }}>
+                Save Notification Rules
+              </button>
+            </>
+          )}
         </form>
       )}
     </div>
