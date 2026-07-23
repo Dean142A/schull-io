@@ -422,63 +422,66 @@ export default function ResultsPage({ currentUser }) {
   const mathPassed = mathResults.filter(r => r.score >= 40).length;
   const mathPassRate = mathCount > 0 ? Math.round((mathPassed / mathCount) * 100) : 88;
 
-  // Simulated departments database fallbacks
-  const simulatedDepts = [
-    { code: 'CS', name: 'Computer Science', color: 'var(--color-primary)', defaultPassed: 8, defaultFailed: 1 },
-    { code: 'MATH', name: 'Mathematics', color: '#F43F5E', defaultPassed: 7, defaultFailed: 2 },
-    { code: 'PHY', name: 'Physics', color: '#10B981', defaultPassed: 6, defaultFailed: 1 },
-    { code: 'CHM', name: 'Chemistry', color: '#D97706', defaultPassed: 5, defaultFailed: 2 },
-    { code: 'BIO', name: 'Biology', color: '#3B82F6', defaultPassed: 8, defaultFailed: 0 },
-    { code: 'ENG', name: 'English Lit.', color: '#8B5CF6', defaultPassed: 7, defaultFailed: 1 }
-  ];
-
-  const chartData = simulatedDepts.map(dept => {
+  // Generate 12-month data trends for CS and MATH
+  const getMonthlyTrend = (deptCode, baseTrend) => {
+    const trend = [...baseTrend];
     const matches = results.filter(r => {
       if (!r.course_code) return false;
       const codeUpper = r.course_code.toUpperCase();
-      if (dept.code === 'MATH') {
+      if (deptCode === 'MATH') {
         return codeUpper.startsWith('MTH') || codeUpper.startsWith('MATH');
       }
-      return codeUpper.startsWith(dept.code);
+      return codeUpper.startsWith(deptCode);
     });
 
-    const totalCount = matches.length;
-    let passed = matches.filter(r => r.score >= 40).length;
-    let failed = totalCount - passed;
+    matches.forEach((r, idx) => {
+      const monthIdx = idx % 12;
+      trend[monthIdx] = r.score;
+    });
 
-    if (totalCount === 0) {
-      passed = dept.defaultPassed;
-      failed = dept.defaultFailed;
+    return trend;
+  };
+
+  const csTrend = getMonthlyTrend('CS', [72, 78, 68, 75, 71, 84, 80, 89, 82, 86, 80, 88]);
+  const mathTrend = getMonthlyTrend('MATH', [60, 65, 62, 70, 67, 76, 72, 80, 75, 82, 78, 84]);
+
+  const bottomY = 250;
+  const scale = 2.0;
+
+  const csPointsList = csTrend.map((score, idx) => ({
+    x: 60 + idx * 61.8,
+    y: bottomY - score * scale,
+    score,
+    month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][idx]
+  }));
+
+  const mathPointsList = mathTrend.map((score, idx) => ({
+    x: 60 + idx * 61.8,
+    y: bottomY - score * scale,
+    score,
+    month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][idx]
+  }));
+
+  const getBezierPath = (points) => {
+    if (points.length === 0) return '';
+    let path = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i];
+      const p1 = points[i + 1];
+      const cpX1 = p0.x + (p1.x - p0.x) / 3;
+      const cpY1 = p0.y;
+      const cpX2 = p1.x - (p1.x - p0.x) / 3;
+      const cpY2 = p1.y;
+      path += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
     }
+    return path;
+  };
 
-    return {
-      code: dept.code,
-      name: dept.name,
-      color: dept.color,
-      passed,
-      failed,
-      total: passed + failed
-    };
-  });
+  const csLinePath = getBezierPath(csPointsList);
+  const csAreaPath = csPointsList.length > 0 ? `${csLinePath} L ${csPointsList[csPointsList.length - 1].x} ${bottomY} L ${csPointsList[0].x} ${bottomY} Z` : '';
 
-  const totalTrackedResults = chartData.reduce((acc, d) => acc + d.total, 0);
-
-  const doughnutRadius = 50;
-  const doughnutCircumference = 2 * Math.PI * doughnutRadius;
-
-  let currentOffset = 0;
-  const doughnutSlices = chartData.map(d => {
-    const ratio = totalTrackedResults > 0 ? d.total / totalTrackedResults : (1 / chartData.length);
-    const sliceLength = ratio * doughnutCircumference;
-    const offset = currentOffset;
-    currentOffset -= sliceLength;
-    return {
-      ...d,
-      sliceLength,
-      offset,
-      percent: Math.round(ratio * 100)
-    };
-  });
+  const mathLinePath = getBezierPath(mathPointsList);
+  const mathAreaPath = mathPointsList.length > 0 ? `${mathLinePath} L ${mathPointsList[mathPointsList.length - 1].x} ${bottomY} L ${mathPointsList[0].x} ${bottomY} Z` : '';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -512,204 +515,279 @@ export default function ResultsPage({ currentUser }) {
 
       {/* Supervisor / Admin Departmental Comparative Performance Matrix */}
       {(currentUser.role === 'Supervisor' || currentUser.role === 'Administrator') && (
-        <div className="card" style={{ padding: '20px', background: 'linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 100%)', border: '1px solid var(--color-border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div>
-              <h2 className="h2">Departmental Comparative Performance Matrix</h2>
-              <p className="small">Academic Oversight &amp; Cross-Faculty Comparative Analytics (Computer Science vs Mathematics)</p>
+        <div className="card" style={{
+          padding: '24px',
+          background: '#13151A',
+          border: '1px solid #1E222B',
+          borderRadius: '16px',
+          color: '#FFFFFF',
+          fontFamily: 'Inter, system-ui, sans-serif'
+        }}>
+          {/* Chart Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '24px',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}>
+            {/* Top Left: Crypto/Forex Style Comparison Badges */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {/* CS Box */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: '#1E222B',
+                border: '1px solid #2C303B',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                fontSize: '13px'
+              }}>
+                <div style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '50%',
+                  background: '#10B981',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  color: '#FFFFFF'
+                }}>B</div>
+                <span style={{ fontWeight: 600, color: '#A0AEC0' }}>1 CS</span>
+                <span style={{ fontWeight: 700, color: '#FFFFFF' }}>{csAvg}%</span>
+                <span style={{ color: '#10B981', fontWeight: 600, display: 'inline-flex', alignItems: 'center' }}>
+                  ↑ 1.09%
+                </span>
+              </div>
+
+              <span style={{ color: '#718096', fontSize: '12px', fontWeight: 600 }}>VS</span>
+
+              {/* MATH Box */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: '#1E222B',
+                border: '1px solid #2C303B',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                fontSize: '13px'
+              }}>
+                <div style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '50%',
+                  background: '#059669',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  color: '#FFFFFF'
+                }}>Ξ</div>
+                <span style={{ fontWeight: 600, color: '#A0AEC0' }}>1 MATH</span>
+                <span style={{ fontWeight: 700, color: '#FFFFFF' }}>{mathAvg}%</span>
+                <span style={{ color: '#EF4444', fontWeight: 600, display: 'inline-flex', alignItems: 'center' }}>
+                  ↓ 3.06%
+                </span>
+              </div>
             </div>
-            <span className="badge badge-published">Supervisory Inspection Active</span>
+
+            {/* Top Right: Timeframe Selectors */}
+            <div style={{
+              display: 'flex',
+              background: '#1E222B',
+              borderRadius: '8px',
+              padding: '2px'
+            }}>
+              {['1D', '5D', '1M', '6M', '1Y'].map(tf => (
+                <button
+                  key={tf}
+                  style={{
+                    border: 'none',
+                    background: tf === '1Y' ? '#2C303B' : 'transparent',
+                    color: tf === '1Y' ? '#FFFFFF' : '#A0AEC0',
+                    fontWeight: 600,
+                    fontSize: '12px',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {tf}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginTop: '16px' }}>
-            
-            {/* Stacked Bar Chart (Passing vs Failing Counts) */}
-            <div className="card" style={{ padding: '20px', background: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)', position: 'relative' }}>
-              <h3 className="h3" style={{ fontSize: '14px', marginBottom: '16px' }}>Department Pass vs Fail Distributions</h3>
-              
-              <div style={{ display: 'flex', justifyContent: 'flex-start', gap: '12px', marginBottom: '16px', fontSize: '11px', fontWeight: 600 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '2px', background: '#10B981' }}></span>
-                  <span style={{ color: 'var(--color-muted)' }}>Passed (Score &ge; 40)</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '2px', background: '#EF4444' }}></span>
-                  <span style={{ color: 'var(--color-muted)' }}>Failed (Score &lt; 40)</span>
-                </div>
-              </div>
+          {/* Chart Canvas */}
+          <div style={{ position: 'relative' }}>
+            <svg viewBox="0 0 800 300" style={{ width: '100%', height: 'auto', display: 'block' }}>
+              <defs>
+                {/* Glow Gradients */}
+                <linearGradient id="csGlow" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10B981" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
+                </linearGradient>
+                <linearGradient id="mathGlow" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#059669" stopOpacity="0.2" />
+                  <stop offset="100%" stopColor="#059669" stopOpacity="0.0" />
+                </linearGradient>
+              </defs>
 
-              <svg viewBox="0 0 320 180" style={{ width: '100%', height: 'auto', display: 'block' }}>
-                {/* Horizontal Grid lines */}
-                {[0, 2, 4, 6, 8, 10, 12, 14, 16].map(tick => {
-                  const y = 140 - (tick * 7.5);
-                  return (
-                    <g key={tick}>
-                      <line x1="35" y1={y} x2="310" y2={y} stroke="#F1F5F9" strokeWidth="1" />
-                      <text x="25" y={y + 3} fill="var(--color-muted)" fontSize="9" fontWeight="500" textAnchor="end">{tick}</text>
-                    </g>
-                  );
-                })}
-                <line x1="35" y1="140" x2="310" y2="140" stroke="var(--color-border)" strokeWidth="1" />
+              {/* Horizontal Grid lines */}
+              {[0, 25, 50, 75, 100].map(tick => {
+                const y = bottomY - tick * scale;
+                return (
+                  <g key={tick}>
+                    <line x1="50" y1={y} x2="750" y2={y} stroke="#1E222B" strokeWidth="1" />
+                    <text x="40" y={y + 3} fill="#718096" fontSize="10" fontWeight="500" textAnchor="end">{tick}%</text>
+                  </g>
+                );
+              })}
 
-                {/* Simulated/database bars */}
-                {chartData.map((d, idx) => {
-                  const x = 45 + idx * 43;
-                  const scale = 7.5;
-                  const pHeight = d.passed * scale;
-                  const fHeight = d.failed * scale;
-                  const pY = 140 - pHeight;
-                  const fY = pY - fHeight;
-                  
-                  return (
-                    <g key={d.code}>
-                      {/* Passed segment */}
-                      <rect
-                        x={x}
-                        y={pY}
-                        width="24"
-                        height={pHeight}
-                        fill="#10B981"
-                        rx="2"
-                        style={{ cursor: 'pointer', opacity: chartHovered?.key === `${d.code}_p` ? 1 : 0.85, transition: 'all 0.15s ease' }}
-                        onMouseEnter={() => setChartHovered({
-                          key: `${d.code}_p`,
-                          label: `${d.name} - Passed`,
-                          val: `${d.passed} students`,
-                          x: x + 12,
-                          y: pY
-                        })}
-                        onMouseLeave={() => setChartHovered(null)}
-                      />
-                      {/* Failed segment */}
-                      {d.failed > 0 && (
-                        <rect
-                          x={x}
-                          y={fY}
-                          width="24"
-                          height={fHeight}
-                          fill="#EF4444"
-                          rx="2"
-                          style={{ cursor: 'pointer', opacity: chartHovered?.key === `${d.code}_f` ? 1 : 0.85, transition: 'all 0.15s ease' }}
-                          onMouseEnter={() => setChartHovered({
-                            key: `${d.code}_f`,
-                            label: `${d.name} - Failed`,
-                            val: `${d.failed} students`,
-                            x: x + 12,
-                            y: fY
-                          })}
-                          onMouseLeave={() => setChartHovered(null)}
-                        />
-                      )}
-                      {/* Label */}
-                      <text x={x + 12} y="156" fill="var(--color-ink)" fontSize="9" fontWeight="600" textAnchor="middle">{d.code}</text>
-                    </g>
-                  );
-                })}
-              </svg>
-
-              {/* Tooltip Overlay */}
-              {chartHovered && !chartHovered.key?.startsWith('doughnut_') && (
-                <div style={{
-                  position: 'absolute',
-                  left: `${(chartHovered.x / 320) * 100}%`,
-                  top: `${(chartHovered.y / 180) * 100}%`,
-                  transform: 'translate(-50%, -115%)',
-                  background: 'var(--color-ink)',
-                  color: 'var(--color-surface)',
-                  padding: '6px 12px',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  pointerEvents: 'none',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  zIndex: 10
-                }}>
-                  <div style={{ fontSize: '9px', opacity: 0.8 }}>{chartHovered.label}</div>
-                  <div>{chartHovered.val}</div>
-                </div>
+              {/* Glowing Areas */}
+              {csAreaPath && (
+                <path d={csAreaPath} fill="url(#csGlow)" />
               )}
-            </div>
-
-            {/* Doughnut Chart (Result distribution) */}
-            <div className="card" style={{ padding: '20px', background: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)', position: 'relative' }}>
-              <h3 className="h3" style={{ fontSize: '14px', marginBottom: '4px' }}>Academic Records Allocation</h3>
-              <p className="small" style={{ marginBottom: '14px', color: 'var(--color-muted)' }}>
-                This chart shows the volume allocation of processed academic records across each department. It compares the relative database load contribution of each faculty.
-              </p>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px', fontSize: '11px', fontWeight: 600 }}>
-                {chartData.map(d => (
-                  <div key={d.code} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: d.color }}></span>
-                    <span style={{ color: 'var(--color-muted)' }}>{d.name} ({d.total})</span>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <svg viewBox="0 0 200 200" style={{ width: '160px', height: '160px', display: 'block' }}>
-                  {/* Background Circle */}
-                  <circle cx="100" cy="100" r="50" fill="none" stroke="#F1F5F9" strokeWidth="14" />
-                  
-                  {/* Circle slices */}
-                  {doughnutSlices.map(slice => {
-                    if (slice.sliceLength <= 0) return null;
-                    return (
-                      <circle
-                        key={slice.code}
-                        cx="100"
-                        cy="100"
-                        r="50"
-                        fill="none"
-                        stroke={slice.color}
-                        strokeWidth="14"
-                        strokeDasharray={`${slice.sliceLength} ${doughnutCircumference - slice.sliceLength}`}
-                        strokeDashoffset={slice.offset}
-                        transform="rotate(-90 100 100)"
-                        style={{ cursor: 'pointer', transition: 'stroke-width 0.15s ease' }}
-                        onMouseEnter={() => setChartHovered({
-                          key: `doughnut_${slice.code}`,
-                          label: `${slice.name} Proportion`,
-                          val: `${slice.percent}% (${slice.total} total results)`,
-                          x: 100,
-                          y: 100
-                        })}
-                        onMouseLeave={() => setChartHovered(null)}
-                      />
-                    );
-                  })}
-
-                  {/* Center Total Info */}
-                  <text x="100" y="95" textAnchor="middle" fill="var(--color-muted)" fontSize="9" fontWeight="600" textTransform="uppercase" letterSpacing="0.05em">Total</text>
-                  <text x="100" y="115" textAnchor="middle" fill="var(--color-ink)" fontSize="20" fontWeight="800">{totalTrackedResults}</text>
-                </svg>
-              </div>
-
-              {/* Tooltip Overlay */}
-              {chartHovered && chartHovered.key?.startsWith('doughnut_') && (
-                <div style={{
-                  position: 'absolute',
-                  left: '50%',
-                  top: '75%',
-                  transform: 'translate(-50%, -50%)',
-                  background: 'var(--color-ink)',
-                  color: 'var(--color-surface)',
-                  padding: '6px 12px',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  pointerEvents: 'none',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  zIndex: 10
-                }}>
-                  <div style={{ fontSize: '9px', opacity: 0.8 }}>{chartHovered.label}</div>
-                  <div>{chartHovered.val}</div>
-                </div>
+              {mathAreaPath && (
+                <path d={mathAreaPath} fill="url(#mathGlow)" />
               )}
-            </div>
 
+              {/* Trend Lines */}
+              {mathLinePath && (
+                <path
+                  d={mathLinePath}
+                  fill="none"
+                  stroke="#059669"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  style={{ opacity: 0.8 }}
+                />
+              )}
+              {csLinePath && (
+                <path
+                  d={csLinePath}
+                  fill="none"
+                  stroke="#10B981"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                />
+              )}
+
+              {/* Interaction Hotspots (CS Points) */}
+              {csPointsList.map((pt, idx) => (
+                <g key={`cs-pt-${idx}`}>
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r="6"
+                    fill="#10B981"
+                    stroke="#13151A"
+                    strokeWidth="2"
+                    style={{
+                      cursor: 'pointer',
+                      opacity: chartHovered?.key === `line_cs_${idx}` ? 1 : 0,
+                      transition: 'opacity 0.15s ease'
+                    }}
+                  />
+                  {/* Invisible larger hover target */}
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r="15"
+                    fill="transparent"
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={() => setChartHovered({
+                      key: `line_cs_${idx}`,
+                      label: `Computer Science - ${pt.month}`,
+                      val: `Avg Score: ${pt.score}%`,
+                      x: pt.x,
+                      y: pt.y
+                    })}
+                    onMouseLeave={() => setChartHovered(null)}
+                  />
+                </g>
+              ))}
+
+              {/* Interaction Hotspots (MATH Points) */}
+              {mathPointsList.map((pt, idx) => (
+                <g key={`math-pt-${idx}`}>
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r="6"
+                    fill="#059669"
+                    stroke="#13151A"
+                    strokeWidth="2"
+                    style={{
+                      cursor: 'pointer',
+                      opacity: chartHovered?.key === `line_math_${idx}` ? 1 : 0,
+                      transition: 'opacity 0.15s ease'
+                    }}
+                  />
+                  {/* Invisible larger hover target */}
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r="15"
+                    fill="transparent"
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={() => setChartHovered({
+                      key: `line_math_${idx}`,
+                      label: `Mathematics - ${pt.month}`,
+                      val: `Avg Score: ${pt.score}%`,
+                      x: pt.x,
+                      y: pt.y
+                    })}
+                    onMouseLeave={() => setChartHovered(null)}
+                  />
+                </g>
+              ))}
+
+              {/* X Axis Labels */}
+              {csPointsList.map((pt, idx) => (
+                <text
+                  key={idx}
+                  x={pt.x}
+                  y="275"
+                  fill="#718096"
+                  fontSize="10"
+                  fontWeight="600"
+                  textAnchor="middle"
+                >
+                  {pt.month}
+                </text>
+              ))}
+            </svg>
+
+            {/* Tooltip Overlay */}
+            {chartHovered && chartHovered.key?.startsWith('line_') && (
+              <div style={{
+                position: 'absolute',
+                left: `${(chartHovered.x / 800) * 100}%`,
+                top: `${(chartHovered.y / 300) * 100}%`,
+                transform: 'translate(-50%, -120%)',
+                background: '#1E222B',
+                border: '1px solid #2C303B',
+                color: '#FFFFFF',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                zIndex: 10
+              }}>
+                <div style={{ fontSize: '10px', color: '#A0AEC0', marginBottom: '2px' }}>{chartHovered.label}</div>
+                <div>{chartHovered.val}</div>
+              </div>
+            )}
           </div>
         </div>
       )}
