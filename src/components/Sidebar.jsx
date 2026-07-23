@@ -1,19 +1,28 @@
 import React from 'react';
-import { LayoutDashboard, FileText, ShieldAlert, KeyRound, UserCheck, Shield, Users, Settings, GraduationCap } from 'lucide-react';
+import { LayoutDashboard, FileText, ShieldAlert, KeyRound, UserCheck, Shield, Users, Settings, GraduationCap, X } from 'lucide-react';
 
-export default function Sidebar({ activeTab, setActiveTab, currentUser, demoUsers, onSwitchUser }) {
+export default function Sidebar({ activeTab, setActiveTab, currentUser, demoUsers, onSwitchUser, onCloseSidebar }) {
   const isPublicPortal = activeTab === 'portal';
 
   return (
     <aside className="sidebar">
       {/* Brand Header */}
-      <div style={{ paddingBottom: '24px', borderBottom: '1px solid var(--color-border)', marginBottom: '20px' }}>
-        <div className="wordmark">
-          schull<span>.io</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '24px', borderBottom: '1px solid var(--color-border)', marginBottom: '20px' }}>
+        <div>
+          <div className="wordmark">
+            schull<span>.io</span>
+          </div>
+          <div className="caption" style={{ marginTop: '2px' }}>
+            academic result management
+          </div>
         </div>
-        <div className="caption" style={{ marginTop: '2px' }}>
-          academic result management
-        </div>
+        <button
+          className="btn btn-secondary btn-sm mobile-sidebar-close"
+          onClick={onCloseSidebar}
+          style={{ display: 'none', padding: '6px' }}
+        >
+          <X size={16} />
+        </button>
       </div>
 
       {/* Navigation Items */}

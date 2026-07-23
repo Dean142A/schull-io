@@ -519,7 +519,6 @@ export default function ResultsPage({ currentUser }) {
         <div className="card" style={{
           padding: '24px',
           background: 'linear-gradient(135deg, var(--color-surface) 0%, #FFFFFF 100%)',
-          border: '1px solid var(--color-border)',
           borderRadius: '16px',
           boxShadow: 'var(--shadow-card)'
         }}>
@@ -533,10 +532,9 @@ export default function ResultsPage({ currentUser }) {
             gap: '16px'
           }}>
             <div>
-              <h2 className="h2" style={{ marginBottom: '4px' }}>Departmental Performance Trends</h2>
-              <p className="small" style={{ color: 'var(--color-muted)' }}>Comparative monthly average metrics across Computer Science and Mathematics</p>
+              <h2 className="h2" style={{ marginBottom: '4px', fontWeight: 400 }}>Departmental Performance Trends</h2>
             </div>
-            
+
             {/* Legend Indicators */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '12px', fontWeight: 600 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -839,138 +837,138 @@ export default function ResultsPage({ currentUser }) {
       {/* Results Data Table */}
       {activeTab === 'results' && (
         <div className="table-container" id="tour-results-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Student Code</th>
-              <th>Student Name</th>
-              <th>Course</th>
-              <th>Department</th>
-              <th>Score</th>
-              <th>Grade</th>
-              <th>Lifecycle State</th>
-              <th>Version</th>
-              <th>Active Token</th>
-              <th style={{ textAlign: 'right' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>
-                  <td><Skeleton width={80} /></td>
-                  <td><Skeleton width={120} /></td>
-                  <td>
-                    <Skeleton width={70} /><br />
-                    <Skeleton width={150} style={{ marginTop: '4px' }} />
-                  </td>
-                  <td><Skeleton width={100} /></td>
-                  <td><Skeleton width={30} /></td>
-                  <td><Skeleton width={30} /></td>
-                  <td><Skeleton width={80} /></td>
-                  <td><Skeleton width={20} /></td>
-                  <td><Skeleton width={90} /></td>
-                  <td style={{ textAlign: 'right' }}><Skeleton width={80} /></td>
-                </tr>
-              ))
-            ) : filteredResults.length === 0 ? (
+          <table>
+            <thead>
               <tr>
-                <td colSpan="10" style={{ textAlign: 'center', padding: '24px' }} className="caption">
-                  No matching student result records found.
-                </td>
+                <th>Student Code</th>
+                <th>Student Name</th>
+                <th>Course</th>
+                <th>Department</th>
+                <th>Score</th>
+                <th>Grade</th>
+                <th>Lifecycle State</th>
+                <th>Version</th>
+                <th>Active Token</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
-            ) : (
-              filteredResults.map(r => (
-                <tr key={r.id}>
-                  <td style={{ fontWeight: 600 }}>{r.student_code}</td>
-                  <td>{r.student_name}</td>
-                  <td>
-                    <div style={{ fontWeight: 500 }}>{r.course_code}</div>
-                    <div className="caption">{r.course_title}</div>
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    <td><Skeleton width={80} /></td>
+                    <td><Skeleton width={120} /></td>
+                    <td>
+                      <Skeleton width={70} /><br />
+                      <Skeleton width={150} style={{ marginTop: '4px' }} />
+                    </td>
+                    <td><Skeleton width={100} /></td>
+                    <td><Skeleton width={30} /></td>
+                    <td><Skeleton width={30} /></td>
+                    <td><Skeleton width={80} /></td>
+                    <td><Skeleton width={20} /></td>
+                    <td><Skeleton width={90} /></td>
+                    <td style={{ textAlign: 'right' }}><Skeleton width={80} /></td>
+                  </tr>
+                ))
+              ) : filteredResults.length === 0 ? (
+                <tr>
+                  <td colSpan="10" style={{ textAlign: 'center', padding: '24px' }} className="caption">
+                    No matching student result records found.
                   </td>
-                  <td>{r.department_name}</td>
-                  <td style={{ fontWeight: 700 }}>{r.score.toFixed(1)}</td>
-                  <td>
-                    <span style={{ fontWeight: 700, padding: '2px 8px', background: 'var(--color-canvas)', border: '1px solid var(--color-border)', borderRadius: '4px' }}>
-                      {r.grade}
-                    </span>
-                  </td>
-                  <td><StatusBadge status={r.status} /></td>
-                  <td className="caption">v{r.version}</td>
-                  <td>
-                    {r.active_token_id ? (
-                      <span className="badge badge-published" style={{ fontSize: '11px' }}>
-                        <Key size={10} /> Active
+                </tr>
+              ) : (
+                filteredResults.map(r => (
+                  <tr key={r.id}>
+                    <td style={{ fontWeight: 600 }}>{r.student_code}</td>
+                    <td>{r.student_name}</td>
+                    <td>
+                      <div style={{ fontWeight: 500 }}>{r.course_code}</div>
+                      <div className="caption">{r.course_title}</div>
+                    </td>
+                    <td>{r.department_name}</td>
+                    <td style={{ fontWeight: 700 }}>{r.score.toFixed(1)}</td>
+                    <td>
+                      <span style={{ fontWeight: 700, padding: '2px 8px', background: 'var(--color-canvas)', border: '1px solid var(--color-border)', borderRadius: '4px' }}>
+                        {r.grade}
                       </span>
-                    ) : (
-                      <span className="caption">None</span>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'flex-end' }}>
-                      {/* Token Generation */}
-                      {(currentUser.role === 'Administrator' || currentUser.role === 'Supervisor') && (r.status === 'Locked' || r.status === 'Published') && (
-                        <button
-                          className="btn btn-sm btn-primary"
-                          title="Generate Access Token"
-                          onClick={() => handleGenerateToken(r.id)}
-                        >
-                          <Key size={12} /> Generate
-                        </button>
+                    </td>
+                    <td><StatusBadge status={r.status} /></td>
+                    <td className="caption">v{r.version}</td>
+                    <td>
+                      {r.active_token_id ? (
+                        <span className="badge badge-published" style={{ fontSize: '11px' }}>
+                          <Key size={10} /> Active
+                        </span>
+                      ) : (
+                        <span className="caption">None</span>
                       )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        {/* Token Generation */}
+                        {(currentUser.role === 'Administrator' || currentUser.role === 'Supervisor') && (r.status === 'Locked' || r.status === 'Published') && (
+                          <button
+                            className="btn btn-sm btn-primary"
+                            title="Generate Access Token"
+                            onClick={() => handleGenerateToken(r.id)}
+                          >
+                            <Key size={12} /> Generate
+                          </button>
+                        )}
 
-                      {/* Edit Score */}
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        title="Edit score"
-                        onClick={() => {
-                          setEditModalResult(r);
-                          setEditScore(r.score.toString());
-                          setOverrideReason('');
-                        }}
-                      >
-                        <Edit size={12} /> Edit
-                      </button>
-
-                      {/* Lock (Uploaded -> Locked) */}
-                      {(currentUser.role === 'Administrator' || currentUser.role === 'Supervisor') && r.status === 'Uploaded' && (
-                        <button className="btn btn-sm btn-secondary" onClick={() => handleLock(r.id)}>
-                          <Lock size={12} style={{ color: 'var(--color-warning)' }} /> Lock
-                        </button>
-                      )}
-
-                      {/* Publish (Locked -> Published ONLY) */}
-                      {(currentUser.role === 'Administrator' || currentUser.role === 'Supervisor') && r.status === 'Locked' && (
-                        <button className="btn btn-sm btn-secondary" onClick={() => handlePublish(r.id)}>
-                          <CheckCircle size={12} style={{ color: 'var(--color-success)' }} /> Publish
-                        </button>
-                      )}
-
-                      {/* Unpublish (Published -> Locked, Admin ONLY) */}
-                      {currentUser.role === 'Administrator' && r.status === 'Published' && (
+                        {/* Edit Score */}
                         <button
                           className="btn btn-sm btn-secondary"
+                          title="Edit score"
                           onClick={() => {
-                            setUnpublishModalResult(r);
-                            setUnpublishReason('');
+                            setEditModalResult(r);
+                            setEditScore(r.score.toString());
+                            setOverrideReason('');
                           }}
                         >
-                          <RotateCcw size={12} /> Unpublish
+                          <Edit size={12} /> Edit
                         </button>
-                      )}
 
-                      {/* History */}
-                      <button className="btn btn-sm btn-tertiary" onClick={() => handleViewHistory(r)}>
-                        <History size={12} /> History
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                        {/* Lock (Uploaded -> Locked) */}
+                        {(currentUser.role === 'Administrator' || currentUser.role === 'Supervisor') && r.status === 'Uploaded' && (
+                          <button className="btn btn-sm btn-secondary" onClick={() => handleLock(r.id)}>
+                            <Lock size={12} style={{ color: 'var(--color-warning)' }} /> Lock
+                          </button>
+                        )}
+
+                        {/* Publish (Locked -> Published ONLY) */}
+                        {(currentUser.role === 'Administrator' || currentUser.role === 'Supervisor') && r.status === 'Locked' && (
+                          <button className="btn btn-sm btn-secondary" onClick={() => handlePublish(r.id)}>
+                            <CheckCircle size={12} style={{ color: 'var(--color-success)' }} /> Publish
+                          </button>
+                        )}
+
+                        {/* Unpublish (Published -> Locked, Admin ONLY) */}
+                        {currentUser.role === 'Administrator' && r.status === 'Published' && (
+                          <button
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => {
+                              setUnpublishModalResult(r);
+                              setUnpublishReason('');
+                            }}
+                          >
+                            <RotateCcw size={12} /> Unpublish
+                          </button>
+                        )}
+
+                        {/* History */}
+                        <button className="btn btn-sm btn-tertiary" onClick={() => handleViewHistory(r)}>
+                          <History size={12} /> History
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* Appeals Table */}

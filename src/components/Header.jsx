@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Shield, Building2, LogOut, UserCheck, Settings, ChevronDown, User } from 'lucide-react';
+import { Shield, Building2, LogOut, UserCheck, Settings, ChevronDown, User, Menu } from 'lucide-react';
 import NotificationCenter from './NotificationCenter';
 
-export default function Header({ currentUser, onLogout, onOpenProfile }) {
+export default function Header({ currentUser, onLogout, onOpenProfile, onToggleSidebar }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -30,7 +30,14 @@ export default function Header({ currentUser, onLogout, onOpenProfile }) {
   return (
     <header className="top-header" style={{ position: 'relative' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <h2 style={{ fontSize: '16px', fontWeight: 600 }}>
+        <button
+          className="btn btn-secondary btn-sm mobile-menu-toggle"
+          onClick={onToggleSidebar}
+          style={{ display: 'none', padding: '6px' }}
+        >
+          <Menu size={18} />
+        </button>
+        <h2 className="header-title" style={{ fontSize: '16px', fontWeight: 600 }}>
           {currentUser ? `Welcome, ${currentUser.full_name}` : 'Public Access Portal'}
         </h2>
       </div>

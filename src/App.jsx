@@ -20,6 +20,7 @@ export default function App() {
   });
   const [loading, setLoading] = useState(true);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
@@ -102,13 +103,21 @@ export default function App() {
   }
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          setSidebarOpen(false);
+        }}
         currentUser={currentUser}
         demoUsers={demoUsers}
         onSwitchUser={handleSwitchUser}
+        onCloseSidebar={() => setSidebarOpen(false)}
       />
 
       <div className="main-content">
@@ -116,6 +125,7 @@ export default function App() {
           currentUser={activeTab === 'portal' ? null : currentUser}
           onLogout={handleLogout}
           onOpenProfile={() => setActiveTab('settings')}
+          onToggleSidebar={() => setSidebarOpen(prev => !prev)}
         />
 
         <main className="page-body">
