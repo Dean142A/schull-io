@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import StatusBadge from '../components/StatusBadge';
 import OnboardingTour from '../components/OnboardingTour';
+import Skeleton from '../components/Skeleton';
 import {
   Lock, CheckCircle, RotateCcw, Edit, Key, UploadCloud,
   History, AlertCircle, Check, X, ShieldAlert, Plus, FileSpreadsheet, Sparkles,
@@ -604,11 +605,23 @@ export default function ResultsPage({ currentUser }) {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan="10" style={{ textAlign: 'center', padding: '24px' }} className="caption">
-                  Loading results...
-                </td>
-              </tr>
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i}>
+                  <td><Skeleton width={80} /></td>
+                  <td><Skeleton width={120} /></td>
+                  <td>
+                    <Skeleton width={70} /><br />
+                    <Skeleton width={150} style={{ marginTop: '4px' }} />
+                  </td>
+                  <td><Skeleton width={100} /></td>
+                  <td><Skeleton width={30} /></td>
+                  <td><Skeleton width={30} /></td>
+                  <td><Skeleton width={80} /></td>
+                  <td><Skeleton width={20} /></td>
+                  <td><Skeleton width={90} /></td>
+                  <td style={{ textAlign: 'right' }}><Skeleton width={80} /></td>
+                </tr>
+              ))
             ) : filteredResults.length === 0 ? (
               <tr>
                 <td colSpan="10" style={{ textAlign: 'center', padding: '24px' }} className="caption">

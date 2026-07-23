@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { GraduationCap, TrendingUp, Award, BookOpen, Search, CheckCircle, Clock, Calendar, ArrowUpRight, ArrowDownRight, Layers, FileText, Printer } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import TranscriptPdfModal from '../components/TranscriptPdfModal';
+import Skeleton from '../components/Skeleton';
 
 export default function StudentPortalPage({ currentUser }) {
   const [studentCodeInput, setStudentCodeInput] = useState('STU/2026/001');
@@ -148,7 +149,7 @@ export default function StudentPortalPage({ currentUser }) {
         </div>
       )}
 
-      {student && (
+      {(student || loading) && (
         <>
           {/* Student Profile Card & Top Performance Metrics */}
           <div className="card" style={{ padding: '24px', background: 'linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 100%)', border: '1px solid var(--color-border)' }}>
@@ -169,16 +170,22 @@ export default function StudentPortalPage({ currentUser }) {
                   <GraduationCap size={28} />
                 </div>
                 <div>
-                  <h2 className="h2" style={{ fontSize: '22px' }}>{student.full_name}</h2>
+                  <h2 className="h2" style={{ fontSize: '22px' }}>
+                    {loading ? <Skeleton width={180} height={22} /> : student.full_name}
+                  </h2>
                   <div style={{ display: 'flex', gap: '12px', marginTop: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span className="caption" style={{ fontWeight: 600, color: 'var(--color-ink)' }}>Matric Code: {student.student_code}</span>
+                    <span className="caption" style={{ fontWeight: 600, color: 'var(--color-ink)' }}>
+                      Matric Code: {loading ? <Skeleton width={100} /> : student.student_code}
+                    </span>
                     <span className="caption">&bull;</span>
-                    <span className="caption" style={{ fontWeight: 600 }}>Department: {student.department_name}</span>
+                    <span className="caption" style={{ fontWeight: 600 }}>
+                      Department: {loading ? <Skeleton width={130} /> : student.department_name}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {growthTrajectory !== 0 && (
+              {!loading && growthTrajectory !== 0 && (
                 <div className="badge" style={{
                   padding: '8px 14px',
                   fontSize: '13px',
@@ -199,28 +206,36 @@ export default function StudentPortalPage({ currentUser }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-muted)', marginBottom: '4px' }}>
                   <Award size={16} /> <span className="caption">Cumulative Average</span>
                 </div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-primary)' }}>{overallAvg} / 100</div>
+                <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-primary)' }}>
+                  {loading ? <Skeleton width={80} height={24} /> : `${overallAvg} / 100`}
+                </div>
               </div>
 
               <div style={{ padding: '16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-muted)', marginBottom: '4px' }}>
                   <TrendingUp size={16} /> <span className="caption">Est. GPA (4.00 Scale)</span>
                 </div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-success)' }}>{estimatedGpa}</div>
+                <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-success)' }}>
+                  {loading ? <Skeleton width={60} height={24} /> : estimatedGpa}
+                </div>
               </div>
 
               <div style={{ padding: '16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-muted)', marginBottom: '4px' }}>
                   <BookOpen size={16} /> <span className="caption">Completed Courses</span>
                 </div>
-                <div style={{ fontSize: '24px', fontWeight: 700 }}>{totalCourses} Subjects</div>
+                <div style={{ fontSize: '24px', fontWeight: 700 }}>
+                  {loading ? <Skeleton width={80} height={24} /> : `${totalCourses} Subjects`}
+                </div>
               </div>
 
               <div style={{ padding: '16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-muted)', marginBottom: '4px' }}>
                   <Layers size={16} /> <span className="caption">Academic Terms</span>
                 </div>
-                <div style={{ fontSize: '24px', fontWeight: 700 }}>{terms.length} Terms</div>
+                <div style={{ fontSize: '24px', fontWeight: 700 }}>
+                  {loading ? <Skeleton width={60} height={24} /> : `${terms.length} Terms`}
+                </div>
               </div>
             </div>
           </div>
@@ -232,7 +247,44 @@ export default function StudentPortalPage({ currentUser }) {
               <span className="caption">Historical Academic Record</span>
             </div>
 
-            {sessions.map((sess) => (
+            {loading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ background: 'var(--color-primary-subtle)', padding: '12px 20px', borderRadius: 'var(--radius-card)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '44px' }}>
+                  <Skeleton width={180} />
+                  <Skeleton width={150} />
+                </div>
+                <div className="card" style={{ padding: '24px', marginLeft: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <Skeleton width={120} height={18} />
+                    <Skeleton width={100} height={18} />
+                  </div>
+                  <div className="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Subject</th>
+                          <th>Score</th>
+                          <th>Grade</th>
+                          <th>Status</th>
+                          <th>Instructor Remark</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <tr key={i}>
+                            <td><Skeleton width={120} /></td>
+                            <td><Skeleton width={40} /></td>
+                            <td><Skeleton width={30} /></td>
+                            <td><Skeleton width={60} /></td>
+                            <td><Skeleton width={180} /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ) : sessions.map((sess) => (
               <div key={sess.sessionName} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {/* Session Header Section */}
                 <div style={{

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, BookOpen, Building2, Search, RefreshCw, Plus, CheckCircle, AlertCircle, X, Edit, Sparkles, Award, GraduationCap } from 'lucide-react';
 import OnboardingTour from '../components/OnboardingTour';
+import Skeleton from '../components/Skeleton';
 
 export default function DirectoryPage({ currentUser }) {
   const [data, setData] = useState({ students: [], courses: [], departments: [], lecturers: [] });
@@ -403,11 +404,16 @@ export default function DirectoryPage({ currentUser }) {
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={isStaffManager ? 6 : 5} style={{ textAlign: 'center', padding: '24px' }} className="caption">
-                    Loading registry data...
-                  </td>
-                </tr>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    <td><Skeleton width={80} /></td>
+                    <td><Skeleton width={120} /></td>
+                    <td><Skeleton width={100} /></td>
+                    <td><Skeleton width={160} /></td>
+                    <td><Skeleton width={120} /></td>
+                    {isStaffManager && <td><Skeleton width={80} /></td>}
+                  </tr>
+                ))
               ) : (
                 filteredStudents.map(s => (
                   <tr key={s.id}>
@@ -446,11 +452,15 @@ export default function DirectoryPage({ currentUser }) {
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={isStaffManager ? 5 : 4} style={{ textAlign: 'center', padding: '24px' }} className="caption">
-                    Loading course directory...
-                  </td>
-                </tr>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    <td><Skeleton width={80} /></td>
+                    <td><Skeleton width={180} /></td>
+                    <td><Skeleton width={120} /></td>
+                    <td><Skeleton width={140} /></td>
+                    {isStaffManager && <td><Skeleton width={80} /></td>}
+                  </tr>
+                ))
               ) : (
                 filteredCourses.map(c => (
                   <tr key={c.id}>
@@ -489,11 +499,16 @@ export default function DirectoryPage({ currentUser }) {
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '24px' }} className="caption">
-                    Loading staff registry...
-                  </td>
-                </tr>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    <td><Skeleton width={120} /></td>
+                    <td><Skeleton width={80} /></td>
+                    <td><Skeleton width={160} /></td>
+                    <td><Skeleton width={85} /></td>
+                    <td><Skeleton width={110} /></td>
+                    <td><Skeleton width={180} /></td>
+                  </tr>
+                ))
               ) : (
                 data.lecturers?.map(l => {
                   const teacherCourses = data.courses?.filter(c => c.lecturer_id === l.id) || [];

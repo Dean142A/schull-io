@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { KeyRound, Clock, ShieldCheck, AlertCircle, RefreshCw, Download, Flag, CheckCircle, X } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+import Skeleton from '../components/Skeleton';
 
 export default function TokenPortalPage() {
   const [tokenInput, setTokenInput] = useState('');
@@ -232,13 +233,6 @@ export default function TokenPortalPage() {
         </div>
       )}
 
-      {verifying && (
-        <div className="card" style={{ padding: '32px', textAlign: 'center', marginBottom: '24px' }}>
-          <RefreshCw className="spin" size={32} style={{ color: 'var(--color-primary)', margin: '0 auto 16px auto' }} />
-          <h3 className="h3">Verifying Academic Transcript...</h3>
-          <p className="small">Checking cryptographic signatures against the security database.</p>
-        </div>
-      )}
 
       {verificationError && (
         <div className="alert alert-error" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -249,19 +243,35 @@ export default function TokenPortalPage() {
         </div>
       )}
 
-      {verificationData && (
-        <div className="card" style={{ padding: '32px', marginBottom: '24px', borderTop: `4px solid ${verificationData.status === 'TAMPERED_COMPROMISED' ? 'var(--color-error)' : 'var(--color-success)'}` }}>
+      {(verificationData || verifying) && (
+        <div className="card" style={{ padding: '32px', marginBottom: '24px', borderTop: `4px solid ${verifying ? 'var(--color-primary)' : (verificationData.status === 'TAMPERED_COMPROMISED' ? 'var(--color-error)' : 'var(--color-success)')}` }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <ShieldCheck size={24} style={{ color: verificationData.status === 'TAMPERED_COMPROMISED' ? 'var(--color-error)' : 'var(--color-success)' }} />
+              <ShieldCheck size={24} style={{ color: verifying ? 'var(--color-primary)' : (verificationData.status === 'TAMPERED_COMPROMISED' ? 'var(--color-error)' : 'var(--color-success)') }} />
               <h2 className="h2">Transcript Authenticity Status</h2>
             </div>
-            <button className="btn btn-secondary btn-sm" onClick={() => setVerificationData(null)}>
+            <button className="btn btn-secondary btn-sm" onClick={() => { setVerificationData(null); }} disabled={verifying}>
               Clear Verification
             </button>
           </div>
 
-          {verificationData.status === 'TAMPERED_COMPROMISED' ? (
+          {verifying ? (
+            <div style={{
+              background: '#F1F5F9',
+              border: '1px solid #CBD5E1',
+              borderRadius: '8px',
+              padding: '16px',
+              color: 'var(--color-primary)',
+              marginBottom: '20px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <RefreshCw className="spin" size={20} />
+              Verifying Cryptographic Transcript Signature...
+            </div>
+          ) : verificationData.status === 'TAMPERED_COMPROMISED' ? (
             <div style={{
               background: '#FEF2F2',
               border: '1px solid #FCA5A5',
@@ -297,11 +307,13 @@ export default function TokenPortalPage() {
 
           <div style={{ background: 'var(--color-surface-hover)', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase' }}>Student Record</div>
-            <div style={{ fontSize: '18px', fontWeight: 700, marginTop: '4px' }}>{verificationData.student.full_name}</div>
+            <div style={{ fontSize: '18px', fontWeight: 700, marginTop: '4px' }}>
+              {verifying ? <Skeleton width={180} height={20} /> : verificationData.student.full_name}
+            </div>
             <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '13px' }}>
-              <span>Matric: <strong>{verificationData.student.student_code}</strong></span>
+              <span>Matric: <strong>{verifying ? <Skeleton width={80} /> : verificationData.student.student_code}</strong></span>
               <span>&bull;</span>
-              <span>Department: <strong>{verificationData.student.department_name}</strong></span>
+              <span>Department: <strong>{verifying ? <Skeleton width={120} /> : verificationData.student.department_name}</strong></span>
             </div>
           </div>
 
@@ -318,28 +330,40 @@ export default function TokenPortalPage() {
                 </tr>
               </thead>
               <tbody>
-                {verificationData.results.map((r, i) => (
-                  <tr key={i}>
-                    <td><strong>{r.course_code}</strong><br/><span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{r.course_title}</span></td>
-                    <td>{r.session}<br/><span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{r.semester} Term</span></td>
-                    <td style={{ fontWeight: 700 }}>{r.score}</td>
-                    <td><span className="badge badge-published">{r.grade}</span></td>
-                    <td>
-                      {r.isIntact ? (
-                        <span className="badge badge-published" style={{ background: '#ECFDF5', color: '#047857' }}>Secure</span>
-                      ) : (
-                        <span className="badge badge-draft" style={{ background: '#FEF2F2', color: '#B91C1C' }}>TAMPERED</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {verifying ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <tr key={i}>
+                      <td><Skeleton width={140} /></td>
+                      <td><Skeleton width={100} /></td>
+                      <td><Skeleton width={45} /></td>
+                      <td><Skeleton width={30} /></td>
+                      <td><Skeleton width={60} /></td>
+                    </tr>
+                  ))
+                ) : (
+                  verificationData.results.map((r, i) => (
+                    <tr key={i}>
+                      <td><strong>{r.course_code}</strong><br/><span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{r.course_title}</span></td>
+                      <td>{r.session}<br/><span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>{r.semester} Term</span></td>
+                      <td style={{ fontWeight: 700 }}>{r.score}</td>
+                      <td><span className="badge badge-published">{r.grade}</span></td>
+                      <td>
+                        {r.isIntact ? (
+                          <span className="badge badge-published" style={{ background: '#ECFDF5', color: '#047857' }}>Secure</span>
+                        ) : (
+                          <span className="badge badge-draft" style={{ background: '#FEF2F2', color: '#B91C1C' }}>TAMPERED</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', fontSize: '12px', color: 'var(--color-muted)', borderTop: '1px solid var(--color-border)', paddingTop: '12px' }}>
             <span>Registrar Signature: <strong>Ogude Dean</strong></span>
-            <span>Verified: <strong>{new Date(verificationData.verification_timestamp).toLocaleString()}</strong></span>
+            <span>Verified: <strong>{verifying ? <Skeleton width={150} /> : new Date(verificationData.verification_timestamp).toLocaleString()}</strong></span>
           </div>
         </div>
       )}
