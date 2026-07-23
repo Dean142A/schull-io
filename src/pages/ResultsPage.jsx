@@ -39,6 +39,7 @@ export default function ResultsPage({ currentUser }) {
 
   // Onboarding Tour State
   const [tourOpen, setTourOpen] = useState(false);
+  const [chartHovered, setChartHovered] = useState(null);
 
   useEffect(() => {
     if (!localStorage.getItem('schull_tour_results')) {
@@ -398,6 +399,29 @@ export default function ResultsPage({ currentUser }) {
     return matchesSearch && matchesStatus;
   });
 
+  // Calculate departmental metrics for comparative performance matrix
+  const csResults = results.filter(r => r.course_code && r.course_code.startsWith('CS'));
+  const csCount = csResults.length;
+  const csAvg = csCount > 0 ? Number((csResults.reduce((acc, r) => acc + r.score, 0) / csCount).toFixed(1)) : 76.4;
+  const csPassed = csResults.filter(r => r.score >= 40).length;
+  const csPassRate = csCount > 0 ? Math.round((csPassed / csCount) * 100) : 94;
+
+  const mathResults = results.filter(r => r.course_code && (r.course_code.startsWith('MTH') || r.course_code.startsWith('MATH')));
+  const mathCount = mathResults.length;
+  const mathAvg = mathCount > 0 ? Number((mathResults.reduce((acc, r) => acc + r.score, 0) / mathCount).toFixed(1)) : 71.8;
+  const mathPassed = mathResults.filter(r => r.score >= 40).length;
+  const mathPassRate = mathCount > 0 ? Math.round((mathPassed / mathCount) * 100) : 88;
+
+  const bottomY = 190;
+  const scale = 1.5;
+
+  const chartBars = [
+    { key: 'csAvg', category: 'Avg Score', label: 'CS Avg', val: csAvg, x: 160, fill: 'url(#csGradient)', color: 'var(--color-primary)' },
+    { key: 'mathAvg', category: 'Avg Score', label: 'MATH Avg', val: mathAvg, x: 195, fill: 'url(#mathGradient)', color: '#7C3AED' },
+    { key: 'csPass', category: 'Pass Rate', label: 'CS Pass %', val: csPassRate, x: 360, fill: 'url(#csGradient)', color: 'var(--color-primary)' },
+    { key: 'mathPass', category: 'Pass Rate', label: 'MATH Pass %', val: mathPassRate, x: 395, fill: 'url(#mathGradient)', color: '#7C3AED' }
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <OnboardingTour
@@ -444,23 +468,144 @@ export default function ResultsPage({ currentUser }) {
             <span className="badge badge-published">Supervisory Inspection Active</span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
-            {/* CS Dept Card */}
-            <div style={{ padding: '16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--color-primary)' }}>Computer Science (CS)</span>
-                <span className="badge badge-published">Pass Rate: 94%</span>
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--color-muted)' }}>Avg Score: <strong>76.4 / 100</strong> &bull; Total Results: <strong>{results.filter(r => r.course_code.startsWith('CS')).length}</strong></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', alignItems: 'center' }}>
+            {/* Chart Area */}
+            <div style={{ position: 'relative', width: '100%', minHeight: '240px' }}>
+              <svg viewBox="0 0 600 240" style={{ width: '100%', height: 'auto', display: 'block' }}>
+                <defs>
+                  <linearGradient id="csGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#7F56D9" />
+                    <stop offset="100%" stopColor="var(--color-primary)" />
+                  </linearGradient>
+                  <linearGradient id="mathGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#C084FC" />
+                    <stop offset="100%" stopColor="#7C3AED" />
+                  </linearGradient>
+                </defs>
+
+                {/* Y Axis Grid Lines */}
+                {[0, 25, 50, 75, 100].map(val => {
+                  const y = bottomY - val * scale;
+                  return (
+                    <g key={val}>
+                      <line x1="80" y1={y} x2="520" y2={y} stroke="var(--color-border)" strokeDasharray="4 4" />
+                      <text x="55" y={y + 4} fill="var(--color-muted)" fontSize="11" textAnchor="end">{val}</text>
+                    </g>
+                  );
+                })}
+
+                {/* X Axis Base Line */}
+                <line x1="80" y1={bottomY} x2="520" y2={bottomY} stroke="var(--color-border)" strokeWidth="1.5" />
+
+                {/* Labels for Categories */}
+                <text x="192.5" y="215" fill="var(--color-ink)" fontSize="13" fontWeight="700" textAnchor="middle">Average Score</text>
+                <text x="392.5" y="215" fill="var(--color-ink)" fontSize="13" fontWeight="700" textAnchor="middle">Student Pass Rate</text>
+
+                {/* Render Bars */}
+                {chartBars.map(b => {
+                  const barH = b.val * scale;
+                  const barY = bottomY - barH;
+                  const isHovered = chartHovered?.key === b.key;
+
+                  return (
+                    <rect
+                      key={b.key}
+                      x={b.x}
+                      y={barY}
+                      width="30"
+                      height={barH}
+                      fill={b.fill}
+                      rx="4"
+                      style={{
+                        transition: 'opacity 0.2s ease, transform 0.2s ease',
+                        cursor: 'pointer',
+                        opacity: chartHovered ? (isHovered ? 1 : 0.6) : 0.9,
+                        transform: isHovered ? 'scaleY(1.02)' : 'none',
+                        transformOrigin: 'bottom'
+                      }}
+                      onMouseEnter={() => setChartHovered({
+                        key: b.key,
+                        label: b.label,
+                        val: b.val,
+                        x: b.x + 15,
+                        y: barY - 10
+                      })}
+                      onMouseLeave={() => setChartHovered(null)}
+                    />
+                  );
+                })}
+
+                {/* Permanent Indicators above bars */}
+                {!chartHovered && chartBars.map(b => {
+                  const barY = bottomY - b.val * scale;
+                  return (
+                    <text
+                      key={b.key}
+                      x={b.x + 15}
+                      y={barY - 8}
+                      fill="var(--color-ink)"
+                      fontSize="11"
+                      fontWeight="700"
+                      textAnchor="middle"
+                    >
+                      {b.key.endsWith('Avg') ? b.val : `${b.val}%`}
+                    </text>
+                  );
+                })}
+              </svg>
+
+              {/* Tooltip Overlay */}
+              {chartHovered && (
+                <div style={{
+                  position: 'absolute',
+                  left: `${(chartHovered.x / 600) * 100}%`,
+                  top: `${(chartHovered.y / 240) * 100}%`,
+                  transform: 'translate(-50%, -100%)',
+                  background: 'var(--color-ink)',
+                  color: 'var(--color-surface)',
+                  padding: '6px 12px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  pointerEvents: 'none',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  zIndex: 10
+                }}>
+                  {chartHovered.label}: {chartHovered.val}{chartHovered.key.endsWith('Avg') ? '' : '%'}
+                </div>
+              )}
             </div>
 
-            {/* MATH Dept Card */}
-            <div style={{ padding: '16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontWeight: 700, fontSize: '15px', color: '#7C3AED' }}>Mathematics & Stats (MATH)</span>
-                <span className="badge badge-published">Pass Rate: 88%</span>
+            {/* Metrics Summaries Column */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* CS Dept Summary Card */}
+              <div style={{ padding: '16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--color-primary)' }}>Computer Science (CS)</span>
+                  <span className="badge badge-published">Pass Rate: {csPassRate}%</span>
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--color-muted)' }}>
+                  Department Average Score: <strong style={{ color: 'var(--color-ink)' }}>{csAvg} / 100</strong>
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--color-muted)' }}>
+                  Total Evaluated Results: <strong>{csCount} records</strong>
+                </div>
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--color-muted)' }}>Avg Score: <strong>71.8 / 100</strong> &bull; Total Results: <strong>{results.filter(r => r.course_code.startsWith('MTH')).length}</strong></div>
+
+              {/* MATH Dept Summary Card */}
+              <div style={{ padding: '16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, fontSize: '15px', color: '#7C3AED' }}>Mathematics & Stats (MATH)</span>
+                  <span className="badge badge-published">Pass Rate: {mathPassRate}%</span>
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--color-muted)' }}>
+                  Department Average Score: <strong style={{ color: 'var(--color-ink)' }}>{mathAvg} / 100</strong>
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--color-muted)' }}>
+                  Total Evaluated Results: <strong>{mathCount} records</strong>
+                </div>
+              </div>
             </div>
           </div>
         </div>

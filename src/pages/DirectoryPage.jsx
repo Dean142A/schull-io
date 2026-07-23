@@ -334,7 +334,7 @@ export default function DirectoryPage({ currentUser }) {
           <button
             className={`btn btn-sm ${tab === 'honor_roll' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setTab('honor_roll')}
-            style={{ background: tab === 'honor_roll' ? 'var(--color-primary)' : '#FFFBEB', color: tab === 'honor_roll' ? '#FFFFFF' : '#B45309', border: '1px solid #FCD34D' }}
+            style={{ background: tab === 'honor_roll' ? 'var(--color-primary)' : '#FFFBEB', color: tab === 'honor_roll' ? '#FFFFFF' : '#B45309' }}
           >
             <Award size={12} /> Dean's Honor Roll ({filteredStudents.length > 0 ? 3 : 0})
           </button>
