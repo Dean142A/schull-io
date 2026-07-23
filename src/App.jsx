@@ -14,9 +14,16 @@ import ProfileModal from './components/ProfileModal';
 export default function App() {
   const [demoUsers, setDemoUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('results');
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = localStorage.getItem('activeTab');
+    return saved || 'results';
+  });
   const [loading, setLoading] = useState(true);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

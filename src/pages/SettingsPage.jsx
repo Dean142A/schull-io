@@ -431,25 +431,26 @@ export default function SettingsPage({ currentUser, onUpdateUser }) {
                 <div style={{ fontWeight: 700 }}>2FA Protection Status</div>
                 <div className="caption">{currentUser?.two_factor_enabled === 1 ? 'Active & Enforced' : 'Not Active'}</div>
               </div>
-              <label className="switch-container">
-                <input
-                  type="checkbox"
-                  checked={currentUser?.two_factor_enabled === 1 || totpSetupActive}
-                  onChange={() => {
-                    if (currentUser?.two_factor_enabled === 0) {
-                      if (!totpSetupActive) {
-                        handleStart2faSetup();
-                      } else {
-                        setTotpSetupActive(false);
-                      }
-                    } else {
-                      setShowDisableForm(prev => !prev);
-                    }
-                  }}
-                />
-                <span className="switch-slider"></span>
-              </label>
+              <span className={`badge ${currentUser?.two_factor_enabled === 1 ? 'badge-published' : 'badge-draft'}`} style={{ padding: '6px 12px', fontSize: '12px' }}>
+                {currentUser?.two_factor_enabled === 1 ? 'Enabled' : 'Disabled'}
+              </span>
             </div>
+
+            {currentUser?.two_factor_enabled === 0 && !totpSetupActive && (
+              <div style={{ marginBottom: '20px' }}>
+                <button type="button" className="btn btn-primary" onClick={handleStart2faSetup} disabled={loading}>
+                  {loading ? 'Initializing Setup...' : 'Set Up 2FA Authenticator'}
+                </button>
+              </div>
+            )}
+
+            {currentUser?.two_factor_enabled === 1 && !showDisableForm && (
+              <div style={{ marginBottom: '20px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowDisableForm(true)}>
+                  Deactivate 2FA Protection
+                </button>
+              </div>
+            )}
 
             {totpSetupActive && (
               <form onSubmit={handleEnable2fa} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>

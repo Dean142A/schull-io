@@ -288,6 +288,16 @@ export default function ResultsPage({ currentUser }) {
     }
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setBulkCsvText(event.target.result);
+    };
+    reader.readAsText(file);
+  };
+
   // Bulk Upload Submission
   const handleBulkUpload = async () => {
     setError('');
@@ -412,19 +422,63 @@ export default function ResultsPage({ currentUser }) {
   const mathPassed = mathResults.filter(r => r.score >= 40).length;
   const mathPassRate = mathCount > 0 ? Math.round((mathPassed / mathCount) * 100) : 88;
 
-  // Calculate departmental metrics for stacked bar and doughnut charts
-  const csFailed = csCount - csPassed;
-  const mathFailed = mathCount - mathPassed;
+  // Simulated departments database fallbacks
+  const simulatedDepts = [
+    { code: 'CS', name: 'Computer Science', color: 'var(--color-primary)', defaultPassed: 8, defaultFailed: 1 },
+    { code: 'MATH', name: 'Mathematics', color: '#F43F5E', defaultPassed: 7, defaultFailed: 2 },
+    { code: 'PHY', name: 'Physics', color: '#10B981', defaultPassed: 6, defaultFailed: 1 },
+    { code: 'CHM', name: 'Chemistry', color: '#D97706', defaultPassed: 5, defaultFailed: 2 },
+    { code: 'BIO', name: 'Biology', color: '#3B82F6', defaultPassed: 8, defaultFailed: 0 },
+    { code: 'ENG', name: 'English Lit.', color: '#8B5CF6', defaultPassed: 7, defaultFailed: 1 }
+  ];
 
-  // Doughnut calculations
-  const totalTrackedResults = csCount + mathCount;
-  const csRatio = totalTrackedResults > 0 ? csCount / totalTrackedResults : 0.5;
-  const mathRatio = totalTrackedResults > 0 ? mathCount / totalTrackedResults : 0.5;
+  const chartData = simulatedDepts.map(dept => {
+    const matches = results.filter(r => {
+      if (!r.course_code) return false;
+      const codeUpper = r.course_code.toUpperCase();
+      if (dept.code === 'MATH') {
+        return codeUpper.startsWith('MTH') || codeUpper.startsWith('MATH');
+      }
+      return codeUpper.startsWith(dept.code);
+    });
+
+    const totalCount = matches.length;
+    let passed = matches.filter(r => r.score >= 40).length;
+    let failed = totalCount - passed;
+
+    if (totalCount === 0) {
+      passed = dept.defaultPassed;
+      failed = dept.defaultFailed;
+    }
+
+    return {
+      code: dept.code,
+      name: dept.name,
+      color: dept.color,
+      passed,
+      failed,
+      total: passed + failed
+    };
+  });
+
+  const totalTrackedResults = chartData.reduce((acc, d) => acc + d.total, 0);
 
   const doughnutRadius = 50;
   const doughnutCircumference = 2 * Math.PI * doughnutRadius;
-  const csSliceLength = csRatio * doughnutCircumference;
-  const mathSliceLength = mathRatio * doughnutCircumference;
+
+  let currentOffset = 0;
+  const doughnutSlices = chartData.map(d => {
+    const ratio = totalTrackedResults > 0 ? d.total / totalTrackedResults : (1 / chartData.length);
+    const sliceLength = ratio * doughnutCircumference;
+    const offset = currentOffset;
+    currentOffset -= sliceLength;
+    return {
+      ...d,
+      sliceLength,
+      offset,
+      percent: Math.round(ratio * 100)
+    };
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -484,133 +538,80 @@ export default function ResultsPage({ currentUser }) {
                 </div>
               </div>
 
-              <svg viewBox="0 0 300 180" style={{ width: '100%', height: 'auto', display: 'block' }}>
+              <svg viewBox="0 0 320 180" style={{ width: '100%', height: 'auto', display: 'block' }}>
                 {/* Horizontal Grid lines */}
-                {[0, 2, 4, 6, 8, 10].map(tick => {
-                  const y = 140 - (tick * 10);
+                {[0, 2, 4, 6, 8, 10, 12, 14, 16].map(tick => {
+                  const y = 140 - (tick * 7.5);
                   return (
                     <g key={tick}>
-                      <line x1="40" y1={y} x2="280" y2={y} stroke="#F1F5F9" strokeWidth="1" />
-                      <text x="30" y={y + 3} fill="var(--color-muted)" fontSize="9" fontWeight="500" textAnchor="end">{tick}</text>
+                      <line x1="35" y1={y} x2="310" y2={y} stroke="#F1F5F9" strokeWidth="1" />
+                      <text x="25" y={y + 3} fill="var(--color-muted)" fontSize="9" fontWeight="500" textAnchor="end">{tick}</text>
                     </g>
                   );
                 })}
-                <line x1="40" y1="140" x2="280" y2="140" stroke="var(--color-border)" strokeWidth="1" />
+                <line x1="35" y1="140" x2="310" y2="140" stroke="var(--color-border)" strokeWidth="1" />
 
-                {/* CS Stacked Bar */}
-                {(() => {
-                  const scale = 10; // 10 pixels per student count
-                  const csPHeight = csPassed * scale;
-                  const csFHeight = csFailed * scale;
-                  const csPY = 140 - csPHeight;
-                  const csFY = csPY - csFHeight;
+                {/* Simulated/database bars */}
+                {chartData.map((d, idx) => {
+                  const x = 45 + idx * 43;
+                  const scale = 7.5;
+                  const pHeight = d.passed * scale;
+                  const fHeight = d.failed * scale;
+                  const pY = 140 - pHeight;
+                  const fY = pY - fHeight;
                   
                   return (
-                    <g>
-                      {/* Passed Segment */}
+                    <g key={d.code}>
+                      {/* Passed segment */}
                       <rect
-                        x="90"
-                        y={csPY}
-                        width="30"
-                        height={csPHeight}
+                        x={x}
+                        y={pY}
+                        width="24"
+                        height={pHeight}
                         fill="#10B981"
                         rx="2"
-                        style={{ cursor: 'pointer', opacity: chartHovered?.key === 'cs_p' ? 1 : 0.85, transition: 'all 0.15s ease' }}
+                        style={{ cursor: 'pointer', opacity: chartHovered?.key === `${d.code}_p` ? 1 : 0.85, transition: 'all 0.15s ease' }}
                         onMouseEnter={() => setChartHovered({
-                          key: 'cs_p',
-                          label: 'Computer Science - Passed',
-                          val: `${csPassed} students`,
-                          x: 90 + 15,
-                          y: csPY
+                          key: `${d.code}_p`,
+                          label: `${d.name} - Passed`,
+                          val: `${d.passed} students`,
+                          x: x + 12,
+                          y: pY
                         })}
                         onMouseLeave={() => setChartHovered(null)}
                       />
-                      {/* Failed Segment */}
-                      {csFailed > 0 && (
+                      {/* Failed segment */}
+                      {d.failed > 0 && (
                         <rect
-                          x="90"
-                          y={csFY}
-                          width="30"
-                          height={csFHeight}
+                          x={x}
+                          y={fY}
+                          width="24"
+                          height={fHeight}
                           fill="#EF4444"
                           rx="2"
-                          style={{ cursor: 'pointer', opacity: chartHovered?.key === 'cs_f' ? 1 : 0.85, transition: 'all 0.15s ease' }}
+                          style={{ cursor: 'pointer', opacity: chartHovered?.key === `${d.code}_f` ? 1 : 0.85, transition: 'all 0.15s ease' }}
                           onMouseEnter={() => setChartHovered({
-                            key: 'cs_f',
-                            label: 'Computer Science - Failed',
-                            val: `${csFailed} students`,
-                            x: 90 + 15,
-                            y: csFY
+                            key: `${d.code}_f`,
+                            label: `${d.name} - Failed`,
+                            val: `${d.failed} students`,
+                            x: x + 12,
+                            y: fY
                           })}
                           onMouseLeave={() => setChartHovered(null)}
                         />
                       )}
+                      {/* Label */}
+                      <text x={x + 12} y="156" fill="var(--color-ink)" fontSize="9" fontWeight="600" textAnchor="middle">{d.code}</text>
                     </g>
                   );
-                })()}
-
-                {/* MATH Stacked Bar */}
-                {(() => {
-                  const scale = 10;
-                  const mathPHeight = mathPassed * scale;
-                  const mathFHeight = mathFailed * scale;
-                  const mathPY = 140 - mathPHeight;
-                  const mathFY = mathPY - mathFHeight;
-
-                  return (
-                    <g>
-                      {/* Passed Segment */}
-                      <rect
-                        x="180"
-                        y={mathPY}
-                        width="30"
-                        height={mathPHeight}
-                        fill="#10B981"
-                        rx="2"
-                        style={{ cursor: 'pointer', opacity: chartHovered?.key === 'math_p' ? 1 : 0.85, transition: 'all 0.15s ease' }}
-                        onMouseEnter={() => setChartHovered({
-                          key: 'math_p',
-                          label: 'Mathematics - Passed',
-                          val: `${mathPassed} students`,
-                          x: 180 + 15,
-                          y: mathPY
-                        })}
-                        onMouseLeave={() => setChartHovered(null)}
-                      />
-                      {/* Failed Segment */}
-                      {mathFailed > 0 && (
-                        <rect
-                          x="180"
-                          y={mathFY}
-                          width="30"
-                          height={mathFHeight}
-                          fill="#EF4444"
-                          rx="2"
-                          style={{ cursor: 'pointer', opacity: chartHovered?.key === 'math_f' ? 1 : 0.85, transition: 'all 0.15s ease' }}
-                          onMouseEnter={() => setChartHovered({
-                            key: 'math_f',
-                            label: 'Mathematics - Failed',
-                            val: `${mathFailed} students`,
-                            x: 180 + 15,
-                            y: mathFY
-                          })}
-                          onMouseLeave={() => setChartHovered(null)}
-                        />
-                      )}
-                    </g>
-                  );
-                })()}
-
-                {/* X Axis Labels */}
-                <text x="105" y="156" fill="var(--color-ink)" fontSize="10" fontWeight="600" textAnchor="middle">CS</text>
-                <text x="195" y="156" fill="var(--color-ink)" fontSize="10" fontWeight="600" textAnchor="middle">MATH</text>
+                })}
               </svg>
 
               {/* Tooltip Overlay */}
-              {chartHovered && (chartHovered.key?.includes('cs_') || chartHovered.key?.includes('math_')) && (
+              {chartHovered && !chartHovered.key?.startsWith('doughnut_') && (
                 <div style={{
                   position: 'absolute',
-                  left: `${(chartHovered.x / 300) * 100}%`,
+                  left: `${(chartHovered.x / 320) * 100}%`,
                   top: `${(chartHovered.y / 180) * 100}%`,
                   transform: 'translate(-50%, -115%)',
                   background: 'var(--color-ink)',
@@ -632,17 +633,18 @@ export default function ResultsPage({ currentUser }) {
 
             {/* Doughnut Chart (Result distribution) */}
             <div className="card" style={{ padding: '20px', background: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-card)', position: 'relative' }}>
-              <h3 className="h3" style={{ fontSize: '14px', marginBottom: '16px' }}>Result Load Distribution</h3>
+              <h3 className="h3" style={{ fontSize: '14px', marginBottom: '4px' }}>Academic Records Allocation</h3>
+              <p className="small" style={{ marginBottom: '14px', color: 'var(--color-muted)' }}>
+                This chart shows the volume allocation of processed academic records across each department. It compares the relative database load contribution of each faculty.
+              </p>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-start', gap: '12px', marginBottom: '16px', fontSize: '11px', fontWeight: 600 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-primary)' }}></span>
-                  <span style={{ color: 'var(--color-muted)' }}>Computer Science ({csCount})</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#F43F5E' }}></span>
-                  <span style={{ color: 'var(--color-muted)' }}>Mathematics ({mathCount})</span>
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px', fontSize: '11px', fontWeight: 600 }}>
+                {chartData.map(d => (
+                  <div key={d.code} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: d.color }}></span>
+                    <span style={{ color: 'var(--color-muted)' }}>{d.name} ({d.total})</span>
+                  </div>
+                ))}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -650,53 +652,33 @@ export default function ResultsPage({ currentUser }) {
                   {/* Background Circle */}
                   <circle cx="100" cy="100" r="50" fill="none" stroke="#F1F5F9" strokeWidth="14" />
                   
-                  {/* CS Slice */}
-                  {csSliceLength > 0 && (
-                    <circle
-                      cx="100"
-                      cy="100"
-                      r="50"
-                      fill="none"
-                      stroke="var(--color-primary)"
-                      strokeWidth="14"
-                      strokeDasharray={`${csSliceLength} ${doughnutCircumference - csSliceLength}`}
-                      strokeDashoffset={0}
-                      transform="rotate(-90 100 100)"
-                      style={{ cursor: 'pointer', transition: 'stroke-width 0.15s ease' }}
-                      onMouseEnter={() => setChartHovered({
-                        key: 'doughnut_cs',
-                        label: 'Computer Science proportion',
-                        val: `${Math.round(csRatio * 100)}% of tracked results`,
-                        x: 100,
-                        y: 100
-                      })}
-                      onMouseLeave={() => setChartHovered(null)}
-                    />
-                  )}
-
-                  {/* MATH Slice */}
-                  {mathSliceLength > 0 && (
-                    <circle
-                      cx="100"
-                      cy="100"
-                      r="50"
-                      fill="none"
-                      stroke="#F43F5E"
-                      strokeWidth="14"
-                      strokeDasharray={`${mathSliceLength} ${doughnutCircumference - mathSliceLength}`}
-                      strokeDashoffset={-csSliceLength}
-                      transform="rotate(-90 100 100)"
-                      style={{ cursor: 'pointer', transition: 'stroke-width 0.15s ease' }}
-                      onMouseEnter={() => setChartHovered({
-                        key: 'doughnut_math',
-                        label: 'Mathematics proportion',
-                        val: `${Math.round(mathRatio * 100)}% of tracked results`,
-                        x: 100,
-                        y: 100
-                      })}
-                      onMouseLeave={() => setChartHovered(null)}
-                    />
-                  )}
+                  {/* Circle slices */}
+                  {doughnutSlices.map(slice => {
+                    if (slice.sliceLength <= 0) return null;
+                    return (
+                      <circle
+                        key={slice.code}
+                        cx="100"
+                        cy="100"
+                        r="50"
+                        fill="none"
+                        stroke={slice.color}
+                        strokeWidth="14"
+                        strokeDasharray={`${slice.sliceLength} ${doughnutCircumference - slice.sliceLength}`}
+                        strokeDashoffset={slice.offset}
+                        transform="rotate(-90 100 100)"
+                        style={{ cursor: 'pointer', transition: 'stroke-width 0.15s ease' }}
+                        onMouseEnter={() => setChartHovered({
+                          key: `doughnut_${slice.code}`,
+                          label: `${slice.name} Proportion`,
+                          val: `${slice.percent}% (${slice.total} total results)`,
+                          x: 100,
+                          y: 100
+                        })}
+                        onMouseLeave={() => setChartHovered(null)}
+                      />
+                    );
+                  })}
 
                   {/* Center Total Info */}
                   <text x="100" y="95" textAnchor="middle" fill="var(--color-muted)" fontSize="9" fontWeight="600" textTransform="uppercase" letterSpacing="0.05em">Total</text>
@@ -709,7 +691,7 @@ export default function ResultsPage({ currentUser }) {
                 <div style={{
                   position: 'absolute',
                   left: '50%',
-                  top: '65%',
+                  top: '75%',
                   transform: 'translate(-50%, -50%)',
                   background: 'var(--color-ink)',
                   color: 'var(--color-surface)',
@@ -1289,9 +1271,40 @@ export default function ResultsPage({ currentUser }) {
               Format: <code>student_code, course_code, score, session, semester</code>
             </p>
 
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label>Upload CSV File</label>
+              <div style={{
+                border: '2px dashed var(--color-border)',
+                borderRadius: 'var(--radius-card)',
+                padding: '20px',
+                textAlign: 'center',
+                background: 'var(--color-canvas)',
+                cursor: 'pointer',
+                position: 'relative',
+                marginTop: '6px'
+              }}>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileChange}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    opacity: 0,
+                    cursor: 'pointer'
+                  }}
+                />
+                <div style={{ color: 'var(--color-primary)', fontWeight: 700, fontSize: '13px' }}>Click or Drag a CSV File Here to Upload</div>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>Automatically reads and populates rows below</div>
+              </div>
+            </div>
+
             <div className="form-group">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label>Paste CSV Rows</label>
+                <label>Paste or Review CSV Rows</label>
                 <button
                   type="button"
                   className="btn btn-tertiary btn-sm"
