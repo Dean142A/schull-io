@@ -514,113 +514,39 @@ export default function ResultsPage({ currentUser }) {
       </div>
 
       {/* Supervisor / Admin Departmental Comparative Performance Matrix */}
+      {/* Supervisor / Admin Departmental Comparative Performance Matrix */}
       {(currentUser.role === 'Supervisor' || currentUser.role === 'Administrator') && (
         <div className="card" style={{
           padding: '24px',
-          background: '#13151A',
-          border: '1px solid #1E222B',
+          background: 'linear-gradient(135deg, var(--color-surface) 0%, #FFFFFF 100%)',
+          border: '1px solid var(--color-border)',
           borderRadius: '16px',
-          color: '#FFFFFF',
-          fontFamily: 'Inter, system-ui, sans-serif'
+          boxShadow: 'var(--shadow-card)'
         }}>
           {/* Chart Header */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginBottom: '24px',
+            marginBottom: '20px',
             flexWrap: 'wrap',
             gap: '16px'
           }}>
-            {/* Top Left: Crypto/Forex Style Comparison Badges */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              {/* CS Box */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: '#1E222B',
-                border: '1px solid #2C303B',
-                borderRadius: '8px',
-                padding: '8px 12px',
-                fontSize: '13px'
-              }}>
-                <div style={{
-                  width: '20px',
-                  height: '20px',
-                  borderRadius: '50%',
-                  background: '#10B981',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 'bold',
-                  fontSize: '11px',
-                  color: '#FFFFFF'
-                }}>B</div>
-                <span style={{ fontWeight: 600, color: '#A0AEC0' }}>1 CS</span>
-                <span style={{ fontWeight: 700, color: '#FFFFFF' }}>{csAvg}%</span>
-                <span style={{ color: '#10B981', fontWeight: 600, display: 'inline-flex', alignItems: 'center' }}>
-                  ↑ 1.09%
-                </span>
-              </div>
-
-              <span style={{ color: '#718096', fontSize: '12px', fontWeight: 600 }}>VS</span>
-
-              {/* MATH Box */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: '#1E222B',
-                border: '1px solid #2C303B',
-                borderRadius: '8px',
-                padding: '8px 12px',
-                fontSize: '13px'
-              }}>
-                <div style={{
-                  width: '20px',
-                  height: '20px',
-                  borderRadius: '50%',
-                  background: '#059669',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 'bold',
-                  fontSize: '11px',
-                  color: '#FFFFFF'
-                }}>Ξ</div>
-                <span style={{ fontWeight: 600, color: '#A0AEC0' }}>1 MATH</span>
-                <span style={{ fontWeight: 700, color: '#FFFFFF' }}>{mathAvg}%</span>
-                <span style={{ color: '#EF4444', fontWeight: 600, display: 'inline-flex', alignItems: 'center' }}>
-                  ↓ 3.06%
-                </span>
-              </div>
+            <div>
+              <h2 className="h2" style={{ marginBottom: '4px' }}>Departmental Performance Trends</h2>
+              <p className="small" style={{ color: 'var(--color-muted)' }}>Comparative monthly average metrics across Computer Science and Mathematics</p>
             </div>
-
-            {/* Top Right: Timeframe Selectors */}
-            <div style={{
-              display: 'flex',
-              background: '#1E222B',
-              borderRadius: '8px',
-              padding: '2px'
-            }}>
-              {['1D', '5D', '1M', '6M', '1Y'].map(tf => (
-                <button
-                  key={tf}
-                  style={{
-                    border: 'none',
-                    background: tf === '1Y' ? '#2C303B' : 'transparent',
-                    color: tf === '1Y' ? '#FFFFFF' : '#A0AEC0',
-                    fontWeight: 600,
-                    fontSize: '12px',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {tf}
-                </button>
-              ))}
+            
+            {/* Legend Indicators */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '12px', fontWeight: 600 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-primary)' }}></span>
+                <span style={{ color: 'var(--color-ink)' }}>Computer Science (Avg: {csAvg}%)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#F43F5E' }}></span>
+                <span style={{ color: 'var(--color-ink)' }}>Mathematics (Avg: {mathAvg}%)</span>
+              </div>
             </div>
           </div>
 
@@ -630,12 +556,12 @@ export default function ResultsPage({ currentUser }) {
               <defs>
                 {/* Glow Gradients */}
                 <linearGradient id="csGlow" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10B981" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
+                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.15" />
+                  <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0" />
                 </linearGradient>
                 <linearGradient id="mathGlow" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#059669" stopOpacity="0.2" />
-                  <stop offset="100%" stopColor="#059669" stopOpacity="0.0" />
+                  <stop offset="0%" stopColor="#F43F5E" stopOpacity="0.1" />
+                  <stop offset="100%" stopColor="#F43F5E" stopOpacity="0.0" />
                 </linearGradient>
               </defs>
 
@@ -644,8 +570,8 @@ export default function ResultsPage({ currentUser }) {
                 const y = bottomY - tick * scale;
                 return (
                   <g key={tick}>
-                    <line x1="50" y1={y} x2="750" y2={y} stroke="#1E222B" strokeWidth="1" />
-                    <text x="40" y={y + 3} fill="#718096" fontSize="10" fontWeight="500" textAnchor="end">{tick}%</text>
+                    <line x1="50" y1={y} x2="750" y2={y} stroke="var(--color-border)" strokeWidth="1" />
+                    <text x="40" y={y + 3} fill="var(--color-muted)" fontSize="10" fontWeight="600" textAnchor="end">{tick}%</text>
                   </g>
                 );
               })}
@@ -663,7 +589,7 @@ export default function ResultsPage({ currentUser }) {
                 <path
                   d={mathLinePath}
                   fill="none"
-                  stroke="#059669"
+                  stroke="#F43F5E"
                   strokeWidth="2"
                   strokeLinecap="round"
                   style={{ opacity: 0.8 }}
@@ -673,8 +599,8 @@ export default function ResultsPage({ currentUser }) {
                 <path
                   d={csLinePath}
                   fill="none"
-                  stroke="#10B981"
-                  strokeWidth="3.5"
+                  stroke="var(--color-primary)"
+                  strokeWidth="3"
                   strokeLinecap="round"
                 />
               )}
@@ -685,9 +611,9 @@ export default function ResultsPage({ currentUser }) {
                   <circle
                     cx={pt.x}
                     cy={pt.y}
-                    r="6"
-                    fill="#10B981"
-                    stroke="#13151A"
+                    r="5"
+                    fill="var(--color-primary)"
+                    stroke="var(--color-surface)"
                     strokeWidth="2"
                     style={{
                       cursor: 'pointer',
@@ -705,7 +631,7 @@ export default function ResultsPage({ currentUser }) {
                     onMouseEnter={() => setChartHovered({
                       key: `line_cs_${idx}`,
                       label: `Computer Science - ${pt.month}`,
-                      val: `Avg Score: ${pt.score}%`,
+                      val: `Monthly Avg: ${pt.score}%`,
                       x: pt.x,
                       y: pt.y
                     })}
@@ -720,9 +646,9 @@ export default function ResultsPage({ currentUser }) {
                   <circle
                     cx={pt.x}
                     cy={pt.y}
-                    r="6"
-                    fill="#059669"
-                    stroke="#13151A"
+                    r="5"
+                    fill="#F43F5E"
+                    stroke="var(--color-surface)"
                     strokeWidth="2"
                     style={{
                       cursor: 'pointer',
@@ -740,7 +666,7 @@ export default function ResultsPage({ currentUser }) {
                     onMouseEnter={() => setChartHovered({
                       key: `line_math_${idx}`,
                       label: `Mathematics - ${pt.month}`,
-                      val: `Avg Score: ${pt.score}%`,
+                      val: `Monthly Avg: ${pt.score}%`,
                       x: pt.x,
                       y: pt.y
                     })}
@@ -755,7 +681,7 @@ export default function ResultsPage({ currentUser }) {
                   key={idx}
                   x={pt.x}
                   y="275"
-                  fill="#718096"
+                  fill="var(--color-muted)"
                   fontSize="10"
                   fontWeight="600"
                   textAnchor="middle"
@@ -772,19 +698,18 @@ export default function ResultsPage({ currentUser }) {
                 left: `${(chartHovered.x / 800) * 100}%`,
                 top: `${(chartHovered.y / 300) * 100}%`,
                 transform: 'translate(-50%, -120%)',
-                background: '#1E222B',
-                border: '1px solid #2C303B',
-                color: '#FFFFFF',
+                background: 'var(--color-ink)',
+                color: 'var(--color-surface)',
                 padding: '8px 12px',
                 borderRadius: '6px',
                 fontSize: '12px',
                 fontWeight: 600,
                 pointerEvents: 'none',
                 whiteSpace: 'nowrap',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                boxShadow: 'var(--shadow-card)',
                 zIndex: 10
               }}>
-                <div style={{ fontSize: '10px', color: '#A0AEC0', marginBottom: '2px' }}>{chartHovered.label}</div>
+                <div style={{ fontSize: '10px', opacity: 0.8, marginBottom: '2px' }}>{chartHovered.label}</div>
                 <div>{chartHovered.val}</div>
               </div>
             )}
