@@ -446,10 +446,26 @@ export default function ResultsPage({ currentUser }) {
     dept: 'MATH'
   }));
 
-  const csLinePath = csPointsList.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  // Cubic Bezier curve paths generator (monotone-style tangents)
+  const getBezierPath = (points) => {
+    if (points.length === 0) return '';
+    let path = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i];
+      const p1 = points[i + 1];
+      const cpX1 = p0.x + (p1.x - p0.x) / 3;
+      const cpY1 = p0.y;
+      const cpX2 = p1.x - (p1.x - p0.x) / 3;
+      const cpY2 = p1.y;
+      path += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
+    }
+    return path;
+  };
+
+  const csLinePath = getBezierPath(csPointsList);
   const csAreaPath = csPointsList.length > 0 ? `${csLinePath} L ${csPointsList[csPointsList.length - 1].x} ${bottomY} L ${csPointsList[0].x} ${bottomY} Z` : '';
 
-  const mathLinePath = mathPointsList.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  const mathLinePath = getBezierPath(mathPointsList);
   const mathAreaPath = mathPointsList.length > 0 ? `${mathLinePath} L ${mathPointsList[mathPointsList.length - 1].x} ${bottomY} L ${mathPointsList[0].x} ${bottomY} Z` : '';
 
   return (
@@ -496,26 +512,26 @@ export default function ResultsPage({ currentUser }) {
           {/* Chart Area */}
           <div style={{ position: 'relative', width: '100%', minHeight: '240px', marginTop: '10px' }}>
             {/* Custom Legend at the top-right */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', marginBottom: '12px', fontSize: '12px', fontWeight: 600 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', background: 'var(--color-primary)' }}></span>
-                <span>Computer Science (CS)</span>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '20px', marginBottom: '16px', fontSize: '12px', fontWeight: 600 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: 'var(--color-primary)', boxShadow: '0 0 8px var(--color-primary)' }}></span>
+                <span style={{ color: 'var(--color-muted)' }}>Computer Science (CS)</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', background: '#7C3AED' }}></span>
-                <span>Mathematics (MATH)</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: '#F43F5E', boxShadow: '0 0 8px #F43F5E' }}></span>
+                <span style={{ color: 'var(--color-muted)' }}>Mathematics (MATH)</span>
               </div>
             </div>
 
             <svg viewBox="0 0 600 220" style={{ width: '100%', height: 'auto', display: 'block' }}>
               <defs>
                 <linearGradient id="csAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.25" />
+                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.15" />
                   <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.00" />
                 </linearGradient>
                 <linearGradient id="mathAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#7C3AED" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#7C3AED" stopOpacity="0.00" />
+                  <stop offset="0%" stopColor="#F43F5E" stopOpacity="0.15" />
+                  <stop offset="100%" stopColor="#F43F5E" stopOpacity="0.00" />
                 </linearGradient>
               </defs>
 
@@ -524,8 +540,8 @@ export default function ResultsPage({ currentUser }) {
                 const y = bottomY - val * scale;
                 return (
                   <g key={val}>
-                    <line x1="60" y1={y} x2="540" y2={y} stroke="var(--color-border)" strokeDasharray="4 4" />
-                    <text x="45" y={y + 4} fill="var(--color-muted)" fontSize="10" textAnchor="end">{val}</text>
+                    <line x1="60" y1={y} x2="540" y2={y} stroke="#F1F5F9" strokeWidth="1" />
+                    <text x="45" y={y + 4} fill="var(--color-muted)" fontSize="10" fontWeight="500" textAnchor="end">{val}</text>
                   </g>
                 );
               })}
@@ -538,32 +554,34 @@ export default function ResultsPage({ currentUser }) {
               {mathAreaPath && <path d={mathAreaPath} fill="url(#mathAreaGradient)" />}
 
               {/* Trend Lines */}
-              {csLinePath && <path d={csLinePath} stroke="var(--color-primary)" strokeWidth="2" fill="none" />}
-              {mathLinePath && <path d={mathLinePath} stroke="#7C3AED" strokeWidth="2" fill="none" />}
+              {csLinePath && <path d={csLinePath} stroke="var(--color-primary)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />}
+              {mathLinePath && <path d={mathLinePath} stroke="#F43F5E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />}
 
               {/* Interactive Nodes / Circles for CS */}
               {csPointsList.map((p, idx) => {
                 const isHovered = chartHovered?.dept === 'CS' && chartHovered?.idx === idx;
                 return (
-                  <circle
-                    key={`cs-${idx}`}
-                    cx={p.x}
-                    cy={p.y}
-                    r={isHovered ? 6 : 4}
-                    fill="var(--color-primary)"
-                    stroke="#FFFFFF"
-                    strokeWidth="1.5"
-                    style={{ transition: 'r 0.15s ease', cursor: 'pointer' }}
-                    onMouseEnter={() => setChartHovered({
-                      dept: 'CS',
-                      idx,
-                      label: `CS Point ${idx + 1}`,
-                      val: p.score,
-                      x: p.x,
-                      y: p.y - 10
-                    })}
-                    onMouseLeave={() => setChartHovered(null)}
-                  />
+                  <g key={`cs-group-${idx}`}>
+                    {isHovered && <circle cx={p.x} cy={p.y} r="8" fill="var(--color-primary)" fillOpacity="0.2" />}
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={isHovered ? 5.5 : 4}
+                      fill="var(--color-primary)"
+                      stroke="#FFFFFF"
+                      strokeWidth="2"
+                      style={{ transition: 'all 0.15s ease', cursor: 'pointer' }}
+                      onMouseEnter={() => setChartHovered({
+                        dept: 'CS',
+                        idx,
+                        label: 'Computer Science',
+                        val: p.score,
+                        x: p.x,
+                        y: p.y - 10
+                      })}
+                      onMouseLeave={() => setChartHovered(null)}
+                    />
+                  </g>
                 );
               })}
 
@@ -571,30 +589,32 @@ export default function ResultsPage({ currentUser }) {
               {mathPointsList.map((p, idx) => {
                 const isHovered = chartHovered?.dept === 'MATH' && chartHovered?.idx === idx;
                 return (
-                  <circle
-                    key={`math-${idx}`}
-                    cx={p.x}
-                    cy={p.y}
-                    r={isHovered ? 6 : 4}
-                    fill="#7C3AED"
-                    stroke="#FFFFFF"
-                    strokeWidth="1.5"
-                    style={{ transition: 'r 0.15s ease', cursor: 'pointer' }}
-                    onMouseEnter={() => setChartHovered({
-                      dept: 'MATH',
-                      idx,
-                      label: `MATH Point ${idx + 1}`,
-                      val: p.score,
-                      x: p.x,
-                      y: p.y - 10
-                    })}
-                    onMouseLeave={() => setChartHovered(null)}
-                  />
+                  <g key={`math-group-${idx}`}>
+                    {isHovered && <circle cx={p.x} cy={p.y} r="8" fill="#F43F5E" fillOpacity="0.2" />}
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={isHovered ? 5.5 : 4}
+                      fill="#F43F5E"
+                      stroke="#FFFFFF"
+                      strokeWidth="2"
+                      style={{ transition: 'all 0.15s ease', cursor: 'pointer' }}
+                      onMouseEnter={() => setChartHovered({
+                        dept: 'MATH',
+                        idx,
+                        label: 'Mathematics',
+                        val: p.score,
+                        x: p.x,
+                        y: p.y - 10
+                      })}
+                      onMouseLeave={() => setChartHovered(null)}
+                    />
+                  </g>
                 );
               })}
 
               {/* X Axis label */}
-              <text x="300" y={bottomY + 30} fill="var(--color-muted)" fontSize="11" textAnchor="middle">Chronological Course Performance Sequence</text>
+              <text x="300" y={bottomY + 32} fill="var(--color-muted)" fontSize="10" fontWeight="600" letterSpacing="0.05em" textAnchor="middle" textTransform="uppercase">Chronological Course Performance Sequence</text>
             </svg>
 
             {/* Tooltip Overlay */}
@@ -603,19 +623,23 @@ export default function ResultsPage({ currentUser }) {
                 position: 'absolute',
                 left: `${(chartHovered.x / 600) * 100}%`,
                 top: `${(chartHovered.y / 220) * 100}%`,
-                transform: 'translate(-50%, -100%)',
+                transform: 'translate(-50%, -120%)',
                 background: 'var(--color-ink)',
                 color: 'var(--color-surface)',
-                padding: '6px 12px',
-                borderRadius: '4px',
-                fontSize: '12px',
+                padding: '8px 14px',
+                borderRadius: '6px',
+                fontSize: '11px',
                 fontWeight: 600,
                 pointerEvents: 'none',
                 whiteSpace: 'nowrap',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                zIndex: 10
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                zIndex: 10,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px'
               }}>
-                {chartHovered.dept === 'CS' ? 'Computer Science' : 'Mathematics'}: <strong>{chartHovered.val} / 100</strong>
+                <span className="caption" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '10px' }}>{chartHovered.label}</span>
+                <span style={{ fontSize: '13px', fontWeight: 700 }}>{chartHovered.val} / 100</span>
               </div>
             )}
           </div>
